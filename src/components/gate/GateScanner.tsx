@@ -544,7 +544,7 @@ export const GateScanner: React.FC<GateScannerProps> = ({
               Statistik Sesi Pintu Masuk
             </span>
 
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
               <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800">
                 <span className="text-xs text-slate-400 block">Total Scan</span>
                 <span className="text-lg font-bold text-white font-mono tabular-nums">

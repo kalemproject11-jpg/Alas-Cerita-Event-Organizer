@@ -179,32 +179,24 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
   return (
     <div className="space-y-6">
       {/* Header Info */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-pink-300 via-rose-200 to-amber-200 bg-clip-text text-transparent flex items-center gap-2">
-            <span>Verifikasi Pembayaran &amp; Rekap Seluruh Biodata Peserta</span>
+          <h2 className="text-lg sm:text-xl font-black bg-gradient-to-r from-pink-300 via-rose-200 to-amber-200 bg-clip-text text-transparent">
+            Verifikasi Pembayaran &amp; Biodata Peserta
           </h2>
-          <p className="text-xs text-stone-300 mt-1">
-            Data pemesanan, bukti transfer pembayaran, rekap lengkap biodata peserta pendaftar (Nama, NIK, No. HP, Email), serta fitur unduh E-Ticket digital untuk dikirimkan ke peserta.
+          <p className="text-xs text-stone-300 mt-0.5">
+            Rekap transaksi, bukti transfer, biodata lengkap peserta (Nama, NIK, HP, Email), dan unduh E-Ticket digital.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="px-3.5 py-1.5 bg-[#251323] border border-pink-500/30 rounded-xl text-xs font-mono text-pink-200">
-            Total Peserta: <strong className="text-white font-bold">{issuedTickets.length} Orang</strong>
-          </div>
-          <div className="px-3.5 py-1.5 bg-[#2f1f10] border border-amber-500/40 rounded-xl text-xs font-mono text-amber-300">
-            Antrean Verifikasi: <strong className="font-bold text-[#FACC15]">{pendingBookingsCount} Order</strong>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowConfirmClearAll(true)}
-            className="px-3.5 py-1.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-600/70 text-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-rose-950/25"
-            title="Bersihkan semua data simulasi transaksi, e-ticket, dan log agar dashboard bersih untuk produksi"
-          >
-            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-            <span>Hapus Data Simulasi</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+          <span className="text-pink-200">
+            Total Peserta: <strong className="text-white tabular-nums">{issuedTickets.length} Orang</strong>
+          </span>
+          <span className="text-pink-500/50" aria-hidden="true">&middot;</span>
+          <span className="text-amber-300">
+            Antrean: <strong className="text-[#FACC15] tabular-nums">{pendingBookingsCount} Order</strong>
+          </span>
         </div>
       </div>
 
@@ -214,52 +206,56 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
             <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
             <span>{feedbackMessage}</span>
           </div>
-          <button 
+          <button
+            type="button"
             onClick={() => setFeedbackMessage(null)}
-            className="text-stone-300 hover:text-white text-xs cursor-pointer"
+            className="text-stone-300 hover:text-white text-xs cursor-pointer p-1"
+            aria-label="Tutup notifikasi"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Main View Mode Selector (Tabs) */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-1.5 bg-[#1e0e1d]/95 border border-pink-500/25 rounded-2xl">
-        <div className="flex items-center gap-1.5">
+      {/* Main View Mode Selector & Search Bar */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-2 bg-[#1e0e1d]/95 border border-pink-500/25 rounded-2xl">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex items-center gap-1.5">
           <button
+            type="button"
             onClick={() => setViewMode('transactions')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap min-h-[40px] ${
               viewMode === 'transactions'
                 ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md shadow-pink-500/25'
                 : 'text-stone-300 hover:text-white hover:bg-pink-950/40'
             }`}
           >
-            <CreditCard className="w-4 h-4" />
-            <span>Rekap Transaksi &amp; Bukti Transfer ({bookings.length})</span>
+            <CreditCard className="w-4 h-4 shrink-0" />
+            <span>Rekap Transaksi ({bookings.length})</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setViewMode('attendees')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap min-h-[40px] ${
               viewMode === 'attendees'
                 ? 'bg-gradient-to-r from-amber-400 to-yellow-400 text-stone-950 font-black shadow-md shadow-amber-500/25'
                 : 'text-stone-300 hover:text-white hover:bg-pink-950/40'
             }`}
           >
-            <Users className="w-4 h-4" />
-            <span>Daftar Seluruh Biodata Peserta Terdaftar ({issuedTickets.length})</span>
+            <Users className="w-4 h-4 shrink-0" />
+            <span>Biodata Peserta ({issuedTickets.length})</span>
           </button>
         </div>
 
         {/* Search */}
-        <div className="relative w-full sm:w-72">
+        <div className="relative w-full lg:w-80">
           <Search className="w-4 h-4 text-pink-400/60 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={viewMode === 'transactions' ? "Cari Invoice, Nama Pemesan..." : "Cari Nama Peserta, NIK, No. HP..."}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-[#170a16] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400 focus:ring-1 focus:ring-pink-400"
+            placeholder={viewMode === 'transactions' ? 'Cari Invoice, Nama Pemesan...' : 'Cari Nama Peserta, NIK, No. HP...'}
+            className="w-full pl-9 pr-3 py-2.5 text-xs bg-[#170a16] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400 focus:ring-1 focus:ring-pink-400"
           />
         </div>
       </div>
@@ -535,16 +531,121 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
       {/* TAB 2: DAFTAR SELURUH BIODATA PESERTA LENGKAP */}
       {viewMode === 'attendees' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between text-xs text-pink-200/80">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-pink-200/80">
             <span>
-              Menampilkan <strong className="text-white">{filteredAttendees.length}</strong> dari <strong className="text-white">{issuedTickets.length}</strong> peserta terdaftar.
+              Menampilkan <strong className="text-white tabular-nums">{filteredAttendees.length}</strong> dari <strong className="text-white tabular-nums">{issuedTickets.length}</strong> peserta terdaftar.
             </span>
-            <span className="font-mono text-pink-300/70">
-              Setiap peserta memiliki E-Ticket mandiri yang dapat diunduh untuk dikirimkan melalui WhatsApp / Email.
+            <span className="font-mono text-pink-300/70 text-[11px]">
+              Setiap peserta memiliki E-Ticket mandiri yang dapat diunduh untuk dikirim via WhatsApp / Email.
             </span>
           </div>
 
-          <div className="bg-[#1e0e1d]/90 border border-pink-500/25 rounded-3xl overflow-hidden shadow-lg">
+          {/* Mobile Card View (< md) */}
+          <div className="md:hidden space-y-3">
+            {filteredAttendees.length === 0 ? (
+              <div className="p-8 text-center bg-[#1e0e1d]/90 border border-pink-500/25 rounded-2xl text-stone-400 text-xs">
+                Tidak ada data peserta yang cocok dengan kata kunci &quot;{searchQuery}&quot;.
+              </div>
+            ) : (
+              filteredAttendees.map((t, idx) => {
+                const relatedBooking = bookings.find((b) => b.id === t.bookingId);
+                const isCheckedIn = t.status === 'checked-in';
+                const isVerified = t.verificationStatus === 'verified' || relatedBooking?.verificationStatus === 'verified';
+
+                return (
+                  <div
+                    key={t.id}
+                    className="p-4 bg-[#1e0e1d]/95 border border-pink-500/25 rounded-2xl space-y-3 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-[11px] text-pink-300/60">#{idx + 1}</span>
+                          <span className="font-mono font-bold text-pink-300 text-xs bg-pink-950/50 border border-pink-500/30 px-2 py-0.5 rounded">
+                            {t.ticketNumber}
+                          </span>
+                          {t.packageName && (
+                            <span className="font-mono text-[10px] font-bold text-amber-300">
+                              Paket {t.packageName} ({t.packageMemberIndex || 1}/{t.packageTotalMembers || 1})
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-sm font-bold text-white mt-1.5">{t.attendeeName}</h3>
+                      </div>
+
+                      {isCheckedIn ? (
+                        <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-2 py-0.5 rounded shrink-0">
+                          MASUK GATE
+                        </span>
+                      ) : isVerified ? (
+                        <span className="text-[10px] font-mono font-bold text-pink-300 bg-pink-950/80 border border-pink-600/60 px-2 py-0.5 rounded shrink-0">
+                          TERVERIFIKASI
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-950/80 border border-amber-600/60 px-2 py-0.5 rounded shrink-0">
+                          PROSES (1×24J)
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-1.5 p-3 bg-[#150914] rounded-xl border border-pink-500/15 text-[11px] font-mono">
+                      <div className="flex justify-between gap-2">
+                        <span className="text-pink-300/60">NIK:</span>
+                        <span className="text-amber-300 font-bold">{t.attendeeNik || ('**' + t.attendeeIdLast4)}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-pink-300/60">No. HP:</span>
+                        <span className="text-stone-200">{t.attendeePhone || '-'}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-pink-300/60">Email:</span>
+                        <span className="text-stone-200 truncate">{t.attendeeEmail || '-'}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-pink-300/60">Pemesan:</span>
+                        <span className="text-stone-300 truncate">
+                          {relatedBooking?.customerName || t.attendeeName} ({relatedBooking?.invoiceCode || '-'})
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadTicket(t)}
+                        disabled={downloadingTicketId === t.id}
+                        className="flex-1 py-2.5 px-3 bg-gradient-to-r from-pink-500 to-rose-500 hover:brightness-110 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>{downloadingTicketId === t.id ? 'Mengunduh...' : 'Unduh Tiket'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTicketForModal(t)}
+                        className="p-2.5 bg-[#251323] hover:bg-[#341a32] text-pink-200 rounded-xl transition-colors cursor-pointer border border-pink-500/30"
+                        title="Lihat E-Ticket"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteTicket(t)}
+                        className="p-2.5 bg-rose-950/70 hover:bg-rose-900 text-rose-300 rounded-xl transition-colors cursor-pointer border border-rose-800/60"
+                        title="Hapus tiket peserta ini"
+                      >
+                        <Trash2 className="w-4 h-4 text-rose-400" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop / Laptop Table View (>= md) */}
+          <div className="hidden md:block bg-[#1e0e1d]/90 border border-pink-500/25 rounded-3xl overflow-hidden shadow-lg">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#291327]/90 border-b border-pink-500/25 text-pink-200 font-mono uppercase text-[10px] tracking-wider">
@@ -575,7 +676,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
 
                       return (
                         <tr key={t.id} className="hover:bg-pink-950/20 transition-colors">
-                          <td className="px-4 py-3.5 font-mono text-pink-300/50 text-xs">{idx + 1}</td>
+                          <td className="px-4 py-3.5 font-mono text-pink-300/50 text-xs tabular-nums">{idx + 1}</td>
                           <td className="px-4 py-3.5">
                             <span className="font-mono font-bold text-pink-300 text-xs bg-pink-950/40 border border-pink-500/30 px-2 py-0.5 rounded">
                               {t.ticketNumber}
@@ -584,7 +685,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                           <td className="px-4 py-3.5 font-bold text-white text-xs whitespace-nowrap">
                             {t.attendeeName}
                           </td>
-                          <td className="px-4 py-3.5 font-mono text-amber-300 text-xs whitespace-nowrap">
+                          <td className="px-4 py-3.5 font-mono text-amber-300 text-xs whitespace-nowrap tabular-nums">
                             {t.attendeeNik || ('**' + t.attendeeIdLast4)}
                           </td>
                           <td className="px-4 py-3.5 text-stone-200 text-xs whitespace-nowrap space-y-0.5 font-mono">
@@ -593,7 +694,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                           </td>
                           <td className="px-4 py-3.5 whitespace-nowrap">
                             {t.packageName ? (
-                              <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400 text-stone-950">
+                              <span className="font-mono text-[10px] font-bold text-amber-300">
                                 Paket {t.packageName} ({t.packageMemberIndex || 1}/{t.packageTotalMembers || 1})
                               </span>
                             ) : (
@@ -626,6 +727,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                           <td className="px-4 py-3.5 text-right whitespace-nowrap">
                             <div className="inline-flex items-center gap-1.5">
                               <button
+                                type="button"
                                 onClick={() => handleDownloadTicket(t)}
                                 disabled={downloadingTicketId === t.id}
                                 className="px-2.5 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 hover:brightness-110 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
@@ -636,6 +738,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                               </button>
 
                               <button
+                                type="button"
                                 onClick={() => setSelectedTicketForModal(t)}
                                 className="p-1.5 bg-[#251323] hover:bg-[#341a32] text-pink-200 rounded-lg text-xs transition-colors cursor-pointer border border-pink-500/30"
                                 title="Lihat E-Ticket"

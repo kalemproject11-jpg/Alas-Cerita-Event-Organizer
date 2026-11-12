@@ -136,8 +136,10 @@ class StorageService {
     this.listeners.forEach((l) => l());
   }
 
-  public resetAllData() {
-    if (typeof window === 'undefined') return;
+  public async resetAllData(): Promise<{ success: boolean; message: string }> {
+    if (typeof window === 'undefined') {
+      return { success: true, message: 'Database dikembalikan ke data awal.' };
+    }
     localStorage.removeItem(STORAGE_KEYS.SIMULATION_CLEARED);
     localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(INITIAL_EVENTS));
     localStorage.setItem(STORAGE_KEYS.TICKET_TYPES, JSON.stringify(INITIAL_TICKET_TYPES));
@@ -145,20 +147,45 @@ class StorageService {
     localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(INITIAL_ISSUED_TICKETS));
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
     localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(INITIAL_LOGS));
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_admin');
 
-    // Reset cloud Firestore documents to fresh seed
-    INITIAL_TICKET_TYPES.forEach((tt) => {
-      setDoc(doc(db, 'ticketTypes', tt.id), tt).catch(() => {});
-    });
-    INITIAL_ISSUED_TICKETS.forEach((t) => {
-      setDoc(doc(db, 'issuedTickets', t.id), t).catch(() => {});
-    });
-    INITIAL_BOOKINGS.forEach((b) => {
-      setDoc(doc(db, 'bookings', b.id), b).catch(() => {});
-    });
+    // Clean existing Firestore documents first, then re-seed initial sample data
+    try {
+      const bookingsSnap = await getDocs(collection(db, 'bookings'));
+      for (const d of bookingsSnap.docs) {
+        await deleteDoc(doc(db, 'bookings', d.id));
+      }
+
+      const ticketsSnap = await getDocs(collection(db, 'issuedTickets'));
+      for (const d of ticketsSnap.docs) {
+        await deleteDoc(doc(db, 'issuedTickets', d.id));
+      }
+
+      const logsSnap = await getDocs(collection(db, 'checkInLogs'));
+      for (const d of logsSnap.docs) {
+        await deleteDoc(doc(db, 'checkInLogs', d.id));
+      }
+
+      for (const tt of INITIAL_TICKET_TYPES) {
+        await setDoc(doc(db, 'ticketTypes', tt.id), tt);
+      }
+      for (const b of INITIAL_BOOKINGS) {
+        await setDoc(doc(db, 'bookings', b.id), b);
+      }
+      for (const t of INITIAL_ISSUED_TICKETS) {
+        await setDoc(doc(db, 'issuedTickets', t.id), t);
+      }
+      for (const l of INITIAL_LOGS) {
+        await setDoc(doc(db, 'checkInLogs', l.id), l);
+      }
+    } catch (err) {
+      console.warn('Firestore reset warning:', err);
+    }
 
     this.notify();
+    return {
+      success: true,
+      message: 'Database berhasil dikembalikan ke data awal contoh.',
+    };
   }
 
   /**

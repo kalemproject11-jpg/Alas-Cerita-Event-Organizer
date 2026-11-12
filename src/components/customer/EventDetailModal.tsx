@@ -162,31 +162,33 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-3xl bg-[#1c0e1b] border-2 border-pink-500/35 rounded-3xl shadow-2xl shadow-pink-950/60 overflow-hidden my-4 max-h-[92vh] flex flex-col">
+      <div className="relative w-full max-w-3xl bg-[#1c0e1b] border-2 border-pink-500/35 rounded-3xl shadow-2xl shadow-pink-950/60 overflow-hidden my-2 sm:my-4 max-h-[94dvh] flex flex-col">
         
         {/* Header bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-pink-500/25 bg-[#170a16] sticky top-0 z-20">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-pink-500/25 bg-[#170a16] sticky top-0 z-20 gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-xl bg-white p-0.5 border border-amber-300 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
               <img src="/alas-cerita-logo.jpg" alt="Alas Cerita" className="w-full h-full object-contain" />
             </div>
-            <div>
-              <span className="text-xs font-mono font-black text-pink-400 uppercase tracking-wider block">
+            <div className="min-w-0">
+              <span className="text-[11px] font-mono font-black text-pink-400 uppercase tracking-wider block truncate">
                 Formulir Pemesanan Tiket Resmi
               </span>
-              <span className="text-sm font-black text-white">Alas Cerita &bull; Kalura Secret Garden</span>
+              <span className="text-xs sm:text-sm font-black text-white block truncate">Alas Cerita &bull; Kalura Secret Garden</span>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 text-stone-400 hover:text-pink-300 rounded-xl hover:bg-pink-950/50 transition-colors cursor-pointer"
+            className="p-2 text-stone-400 hover:text-pink-300 rounded-xl hover:bg-pink-950/50 transition-colors cursor-pointer shrink-0"
+            aria-label="Tutup"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 sm:p-8 overflow-y-auto space-y-7 flex-1">
+        <div className="p-4 sm:p-6 lg:p-8 overflow-y-auto space-y-6 flex-1">
           
           {/* STEP 1: PILIH PAKET PENGALAMAN (Fixed Capacity: Single / Couple / Circle) */}
           <div className="space-y-3">
@@ -413,34 +415,34 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         </div>
 
         {/* Modal Footer / Checkout Action */}
-        <div className="px-6 py-4 bg-[#170a16] border-t border-pink-500/25 flex flex-col sm:flex-row items-center justify-between gap-4 sticky bottom-0 z-10">
-          <div>
-            <span className="text-[11px] text-stone-300 block">Total Tagihan Paket ({selectedTier?.name}):</span>
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-[#170a16] border-t border-pink-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sticky bottom-0 z-10">
+          <div className="flex items-center justify-between sm:block">
+            <span className="text-[11px] text-stone-300 block">Total Tagihan ({selectedTier?.name}):</span>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-black text-[#FACC15] font-mono tabular-nums">
+              <span className="text-xl sm:text-2xl font-black text-[#FACC15] font-mono tabular-nums">
                 Rp{totalPrice.toLocaleString('id-ID')}
               </span>
-              <span className="text-xs font-mono text-pink-300 font-bold">
-                &bull; {packageCapacity} Peserta Berhak Hadir
+              <span className="text-[11px] font-mono text-pink-300 font-bold">
+                &bull; {packageCapacity} Orang
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
             <button
               type="button"
               onClick={onClose}
-              className="w-full sm:w-auto px-5 py-3 text-xs font-medium text-stone-400 hover:text-white rounded-xl transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-5 py-2.5 text-xs font-medium text-stone-400 hover:text-white rounded-xl transition-colors cursor-pointer"
             >
               Batal
             </button>
             <button
               type="button"
               onClick={handleProceed}
-              className="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:brightness-110 text-stone-950 text-xs font-black rounded-xl transition-all shadow-lg shadow-pink-500/30 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto px-7 py-3.5 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:brightness-110 text-stone-950 text-xs font-black rounded-xl transition-all shadow-lg shadow-pink-500/30 flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
             >
               <span>Lanjut ke Pembayaran</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 shrink-0" />
             </button>
           </div>
         </div>

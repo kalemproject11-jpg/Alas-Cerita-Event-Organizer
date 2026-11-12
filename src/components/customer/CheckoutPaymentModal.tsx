@@ -281,7 +281,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                 Pilih Metode Pembayaran:
               </label>
 
-              <div className="grid grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {/* 1. QRIS */}
                 <button
                   type="button"
@@ -546,9 +546,9 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
 
                 {proofImage ? (
                   /* Uploaded preview box */
-                  <div className="p-3.5 bg-[#170a16] rounded-2xl border-2 border-amber-400/60 flex items-center justify-between gap-3">
+                  <div className="p-3.5 bg-[#170a16] rounded-2xl border-2 border-amber-400/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3 overflow-hidden">
-                      <div 
+                      <div
                         onClick={() => setShowPreviewModal(true)}
                         className="w-14 h-14 rounded-xl overflow-hidden bg-black border border-pink-500/40 shrink-0 cursor-pointer relative group"
                         title="Klik untuk melihat pratinjau penuh"
@@ -569,17 +569,17 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center justify-end gap-2 shrink-0">
                       <label
                         htmlFor="proof-upload-input"
-                        className="px-3 py-1.5 bg-pink-950/80 hover:bg-pink-900 border border-pink-600/40 text-pink-200 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                        className="px-3 py-2 bg-pink-950/80 hover:bg-pink-900 border border-pink-600/40 text-pink-200 rounded-lg text-xs font-medium cursor-pointer transition-colors"
                       >
                         Ganti Foto
                       </label>
                       <button
                         type="button"
                         onClick={() => setProofImage(null)}
-                        className="p-1.5 text-stone-400 hover:text-rose-400 hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
+                        className="p-2 text-stone-400 hover:text-rose-400 hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
                         title="Hapus foto"
                       >
                         <X className="w-4 h-4" />

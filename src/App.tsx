@@ -8,7 +8,7 @@ import { CheckoutPaymentModal } from './components/customer/CheckoutPaymentModal
 import { ETicketModal } from './components/customer/ETicketModal';
 import { AdminAuthModal } from './components/admin/AdminAuthModal';
 import { AdminUnifiedDashboard } from './components/admin/AdminUnifiedDashboard';
-import { CheckCircle2, Ticket } from 'lucide-react';
+import { Ticket, AlertCircle, X } from 'lucide-react';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User>(() => storageService.getCurrentUser());
@@ -22,13 +22,14 @@ export default function App() {
   // Active navigation: 'catalog' | 'admin_dashboard'
   const [activeTab, setActiveTab] = useState<string>('catalog');
 
-  // Modals state
+  // Modals & notification state
   const [showAdminAuthModal, setShowAdminAuthModal] = useState<boolean>(false);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<Event | null>(null);
   const [preferredTierId, setPreferredTierId] = useState<string | undefined>(undefined);
   const [activeBookingForPayment, setActiveBookingForPayment] = useState<Booking | null>(null);
   const [initialTicketToScan, setInitialTicketToScan] = useState<IssuedTicket | null>(null);
   const [customerSuccessTicket, setCustomerSuccessTicket] = useState<IssuedTicket | null>(null);
+  const [appError, setAppError] = useState<string | null>(null);
 
   // Subscribe to storage updates
   useEffect(() => {
@@ -44,20 +45,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // When switching user or logging in
-  const handleSwitchUser = (userId: string) => {
-    storageService.setCurrentUser(userId);
-    const user = users.find((u) => u.id === userId);
-    if (user) {
-      setCurrentUser(user);
-      if (user.role !== 'customer') {
-        setActiveTab('admin_dashboard');
-      } else {
-        setActiveTab('catalog');
-      }
-    }
-  };
-
   const handleAdminLoginSuccess = (adminUser: User) => {
     storageService.setCurrentUser(adminUser.id);
     setCurrentUser(adminUser);
@@ -66,7 +53,6 @@ export default function App() {
   };
 
   const handleLogoutAdmin = () => {
-    // Revert to customer account
     const customerUser = users.find((u) => u.role === 'customer') || users[1];
     if (customerUser) {
       storageService.setCurrentUser(customerUser.id);
@@ -82,8 +68,9 @@ export default function App() {
     customerName: string;
     customerEmail: string;
     customerPhone: string;
-    attendees: Array<{ name: string; email: string; phone: string; idLast4: string }>;
+    attendees: Array<{ name: string; email: string; phone: string; nik: string; idLast4: string }>;
   }) => {
+    setAppError(null);
     const res = storageService.createBooking({
       userId: currentUser.id,
       ...payload,
@@ -93,7 +80,7 @@ export default function App() {
       setSelectedEventForDetail(null);
       setActiveBookingForPayment(res.booking);
     } else {
-      alert(res.error || 'Gagal membuat pesanan checkout.');
+      setAppError(res.error || 'Gagal membuat pesanan checkout.');
     }
   };
 
@@ -108,7 +95,6 @@ export default function App() {
 
   const handleOpenGateScannerWithTicket = (ticket: IssuedTicket) => {
     setInitialTicketToScan(ticket);
-    // If not admin, require admin login first
     if (currentUser.role === 'customer') {
       setShowAdminAuthModal(true);
     } else {
@@ -116,29 +102,20 @@ export default function App() {
     }
   };
 
-  const handleResetData = () => {
-    if (confirm('Kembalikan semua database dan tiket ke data awal contoh?')) {
-      storageService.resetAllData();
-      setActiveTab('catalog');
-    }
-  };
-
   const isAdminOrStaff = currentUser.role !== 'customer';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1c0f1c] via-[#261421] to-[#22170f] text-stone-100 flex flex-col font-sans selection:bg-pink-500/40 selection:text-pink-200 relative overflow-x-hidden">
-      {/* Radiant ambient glow in pink & yellow */}
+      {/* Ambient glow in pink & yellow */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full bg-pink-500/15 blur-[120px]" />
-        <div className="absolute top-1/3 -right-32 w-[500px] h-[500px] rounded-full bg-amber-400/15 blur-[120px]" />
-        <div className="absolute -bottom-32 left-1/4 w-[600px] h-[600px] rounded-full bg-rose-500/12 blur-[130px]" />
+        <div className="absolute -top-32 -left-32 w-[460px] h-[460px] rounded-full bg-pink-500/15 blur-[120px]" />
+        <div className="absolute top-1/3 -right-32 w-[460px] h-[460px] rounded-full bg-amber-400/15 blur-[120px]" />
+        <div className="absolute -bottom-32 left-1/4 w-[520px] h-[520px] rounded-full bg-rose-500/12 blur-[130px]" />
       </div>
 
-      {/* Top Bar Header with Alas Cerita Branding & Auth Gate */}
+      {/* Top Bar Header */}
       <Header
         currentUser={currentUser}
-        onSwitchUser={handleSwitchUser}
-        users={users}
         activeTab={activeTab}
         onSelectTab={(tab) => {
           if (tab === 'admin_dashboard' && !isAdminOrStaff) {
@@ -147,14 +124,32 @@ export default function App() {
             setActiveTab(tab);
           }
         }}
-        onResetData={handleResetData}
         onOpenAdminLogin={() => setShowAdminAuthModal(true)}
         onLogoutAdmin={handleLogoutAdmin}
       />
 
+      {/* Global inline error notification (replaces window.alert) */}
+      {appError && (
+        <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="p-3.5 bg-rose-950/90 border border-rose-500/50 rounded-2xl text-rose-200 text-xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{appError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAppError(null)}
+              className="p-1 text-rose-300 hover:text-white cursor-pointer"
+              aria-label="Tutup pesan kesalahan"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
         {/* PUBLIC VIEW: Event Catalog & Ticket Booking */}
         {activeTab === 'catalog' && (
           <EventCatalog
@@ -167,7 +162,7 @@ export default function App() {
           />
         )}
 
-        {/* ADMIN UNIFIED DASHBOARD: Only accessible by authenticated Admin/Staff */}
+        {/* ADMIN UNIFIED DASHBOARD */}
         {activeTab === 'admin_dashboard' && isAdminOrStaff && (
           <AdminUnifiedDashboard
             currentUser={currentUser}
@@ -184,27 +179,28 @@ export default function App() {
           />
         )}
 
-        {/* Protection fallback if non-admin somehow hits admin_dashboard tab */}
+        {/* Protection fallback if non-admin hits admin_dashboard tab */}
         {activeTab === 'admin_dashboard' && !isAdminOrStaff && (
-          <div className="p-12 text-center bg-stone-900/60 rounded-3xl border border-stone-800 space-y-4 max-w-md mx-auto my-12">
-            <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/30 text-[#FA7022] flex items-center justify-center mx-auto">
+          <div className="p-8 sm:p-12 text-center bg-[#221221]/80 rounded-3xl border border-pink-500/30 space-y-4 max-w-md mx-auto my-12">
+            <div className="w-16 h-16 rounded-2xl bg-pink-500/15 border border-pink-500/30 text-pink-300 flex items-center justify-center mx-auto">
               <Ticket className="w-8 h-8" />
             </div>
             <h2 className="text-xl font-bold text-white">Akses Dibatasi</h2>
-            <p className="text-xs text-stone-400">
-              Dashboard Gate Scanner dan Manajemen Tiket hanya dapat diakses oleh Admin dan Petugas resmi Alas Cerita.
+            <p className="text-xs text-stone-300">
+              Portal Admin, Gate Scanner, dan Manajemen Tiket hanya dapat diakses oleh Admin dan Petugas resmi Alas Cerita.
             </p>
             <button
+              type="button"
               onClick={() => setShowAdminAuthModal(true)}
-              className="px-6 py-2.5 bg-[#FA7022] hover:bg-[#e05e13] text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-orange-500/30 cursor-pointer"
+              className="px-6 py-3 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:brightness-110 text-stone-950 text-xs font-black rounded-xl transition-all shadow-md shadow-pink-500/25 cursor-pointer"
             >
-              Login Admin Sekarang (admin / admin)
+              Login Portal Admin
             </button>
           </div>
         )}
       </main>
 
-      {/* Admin Authentication Modal: username: admin / password: admin */}
+      {/* Admin Authentication Modal */}
       <AdminAuthModal
         isOpen={showAdminAuthModal}
         onClose={() => setShowAdminAuthModal(false)}
@@ -227,7 +223,7 @@ export default function App() {
         />
       )}
 
-      {/* Checkout & Payment Gateway Simulator */}
+      {/* Checkout & Payment Gateway Modal */}
       {activeBookingForPayment && (
         <CheckoutPaymentModal
           booking={activeBookingForPayment}
@@ -240,7 +236,7 @@ export default function App() {
         />
       )}
 
-      {/* Customer E-Ticket Preview Modal (Shown right after successful checkout) */}
+      {/* Customer E-Ticket Preview Modal */}
       {customerSuccessTicket && (
         <ETicketModal
           ticket={customerSuccessTicket}
@@ -249,25 +245,24 @@ export default function App() {
         />
       )}
 
-      {/* Quiet Technical Footer with Alas Cerita Branding */}
-      <footer className="border-t border-pink-900/30 bg-[#170b16]/90 py-8 px-4 text-xs text-stone-400 mt-auto no-print backdrop-blur-md">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-pink-400">Alas Cerita Event Organizer</span>
-            <span>&middot;</span>
-            <span className="text-yellow-300/90 font-medium">Sistem Pemesanan &amp; Validasi E-Ticket Resmi</span>
+      {/* Quiet Footer */}
+      <footer className="border-t border-pink-900/30 bg-[#170b16]/90 py-6 sm:py-8 px-4 text-xs text-stone-400 mt-auto no-print backdrop-blur-md">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+            <span className="font-bold text-pink-300">Alas Cerita Event Organizer</span>
+            <span aria-hidden="true">&middot;</span>
+            <span className="text-amber-300/90 font-medium">Sistem Pemesanan &amp; Validasi E-Ticket Resmi</span>
           </div>
 
-          <div className="flex items-center gap-4 text-[11px] font-mono text-stone-400">
-            <span>UUID v4 Encrypted QR</span>
-            <span>&middot;</span>
-            <span>Anti-Double Scan Engine</span>
-            <span>&middot;</span>
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 text-[11px] font-mono text-stone-400">
+            <span>Kalura Secret Garden, Yogyakarta</span>
+            <span aria-hidden="true">&middot;</span>
             <button
+              type="button"
               onClick={() => setShowAdminAuthModal(true)}
-              className="text-pink-400 hover:text-yellow-300 transition-colors underline cursor-pointer"
+              className="text-pink-300 hover:text-amber-300 transition-colors underline cursor-pointer"
             >
-              Login Admin (admin / admin)
+              Portal Admin
             </button>
           </div>
         </div>
