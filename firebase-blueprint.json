@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "Event": {
+      "title": "Event",
+      "description": "Master event details for Alas Cerita gathering",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "venue": { "type": "string" },
+        "city": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "posterUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "organizer": { "type": "string" }
+      },
+      "required": ["title", "venue", "startTime", "endTime"]
+    },
+    "TicketType": {
+      "title": "TicketType",
+      "description": "Ticket package tier (Single, Couple, Circle) with quota and pricing",
+      "type": "object",
+      "properties": {
+        "eventId": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "quota": { "type": "number" },
+        "availableQuota": { "type": "number" },
+        "heldQuota": { "type": "number" },
+        "description": { "type": "string" }
+      },
+      "required": ["eventId", "name", "price", "quota", "availableQuota"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Customer ticket purchase checkout transaction",
+      "type": "object",
+      "properties": {
+        "customerName": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "eventId": { "type": "string" },
+        "invoiceCode": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "paymentStatus": { "type": "string", "enum": ["pending", "paid", "expired", "failed"] },
+        "paymentMethod": { "type": "string" },
+        "ticketTypeId": { "type": "string" },
+        "quantity": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["customerName", "customerEmail", "invoiceCode", "totalAmount", "paymentStatus"]
+    },
+    "IssuedTicket": {
+      "title": "IssuedTicket",
+      "description": "Official issued admission ticket with encrypted QR token and visual ticket number",
+      "type": "object",
+      "properties": {
+        "bookingId": { "type": "string" },
+        "eventId": { "type": "string" },
+        "ticketTypeId": { "type": "string" },
+        "ticketTypeName": { "type": "string" },
+        "attendeeName": { "type": "string" },
+        "attendeeEmail": { "type": "string" },
+        "attendeePhone": { "type": "string" },
+        "attendeeIdLast4": { "type": "string" },
+        "ticketNumber": { "type": "string" },
+        "qrToken": { "type": "string" },
+        "status": { "type": "string", "enum": ["valid", "checked-in", "revoked"] },
+        "checkedInAt": { "type": "string" },
+        "checkedInBy": { "type": "string" },
+        "gateName": { "type": "string" },
+        "seat_or_gate": { "type": "string" }
+      },
+      "required": ["ticketNumber", "qrToken", "attendeeName", "status"]
+    },
+    "CheckInLog": {
+      "title": "CheckInLog",
+      "description": "Audit log of gate validation scans",
+      "type": "object",
+      "properties": {
+        "issuedTicketId": { "type": "string" },
+        "ticketNumber": { "type": "string" },
+        "attendeeName": { "type": "string" },
+        "staffName": { "type": "string" },
+        "method": { "type": "string" },
+        "result": { "type": "string" },
+        "message": { "type": "string" },
+        "scannedAt": { "type": "string" },
+        "gateName": { "type": "string" }
+      },
+      "required": ["ticketNumber", "result", "scannedAt"]
+    }
+  },
+  "firestore": {
+    "/events/{eventId}": {
+      "schema": { "$ref": "#/entities/Event" },
+      "description": "Event master catalog"
+    },
+    "/ticketTypes/{ticketTypeId}": {
+      "schema": { "$ref": "#/entities/TicketType" },
+      "description": "Ticket types and live quotas"
+    },
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "Customer booking orders"
+    },
+    "/issuedTickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/IssuedTicket" },
+      "description": "Official issued tickets scanned at gate"
+    },
+    "/checkInLogs/{logId}": {
+      "schema": { "$ref": "#/entities/CheckInLog" },
+      "description": "Gate admission audit log trail"
+    }
+  }
+}

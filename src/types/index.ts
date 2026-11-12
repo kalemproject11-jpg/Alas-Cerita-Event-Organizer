@@ -45,7 +45,7 @@ export interface Event {
 }
 
 export type PaymentStatus = 'pending' | 'paid' | 'expired' | 'failed';
-export type PaymentMethod = 'qris' | 'bca_va' | 'mandiri_va' | 'gopay' | 'credit_card';
+export type PaymentMethod = 'qris' | 'shopeepay' | 'bri' | string;
 
 export interface Booking {
   id: string;
@@ -58,6 +58,12 @@ export interface Booking {
   totalAmount: number;
   paymentStatus: PaymentStatus;
   paymentMethod?: PaymentMethod;
+  paymentProofUrl?: string;
+  senderName?: string;
+  proofUploadedAt?: string;
+  verificationStatus?: 'pending_verification' | 'verified';
+  verifiedAt?: string;
+  verifiedBy?: string;
   paymentUrl?: string;
   createdAt: string;
   expiresAt: string; // 30-minute hold window
@@ -77,10 +83,18 @@ export interface IssuedTicket {
   attendeeName: string;
   attendeeEmail: string;
   attendeePhone: string;
-  attendeeIdLast4: string; // 4-digit identity / KTP verification
+  attendeeNik: string; // NIK (Nomor Induk Kependudukan)
+  attendeeIdLast4?: string; // fallback / last digits
+  packageName?: string; // 'Single' | 'Couple' | 'Circle'
+  packageMemberIndex?: number; // e.g. 1, 2, 3
+  packageTotalMembers?: number; // e.g. 1, 2, 3
+  packageGroupName?: string; // e.g. 'Paket Couple (2 Orang)'
   ticketNumber: string; // 8-char visual code, e.g. 'TCK-8H3P' (no 0/O, 1/I)
   qrToken: string; // Cryptographic UUID v4 (36 chars)
   status: TicketStatus;
+  verificationStatus?: 'pending_verification' | 'verified';
+  verifiedAt?: string;
+  verifiedBy?: string;
   checkedInAt?: string;
   checkedInBy?: string; // Staff ID or Name
   gateName?: string;

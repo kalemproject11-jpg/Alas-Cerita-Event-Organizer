@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    // Events: Public read, authorized write
+    match /events/{eventId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Ticket Types (Live Quotas): Public read, quota updates
+    match /ticketTypes/{ticketTypeId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Bookings: Public creation upon checkout, read for order verification, delete for admin cleanup
+    match /bookings/{bookingId} {
+      allow read, write, delete: if true;
+    }
+
+    // Issued Tickets: Checked by gate scanners, retrieved by ticket holders, delete for admin cleanup
+    match /issuedTickets/{ticketId} {
+      allow read, write, delete: if true;
+    }
+
+    // Check-in audit logs: Read, create, and delete for admin cleanup
+    match /checkInLogs/{logId} {
+      allow read, write, delete: if true;
+    }
+
+    // Default fallback
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

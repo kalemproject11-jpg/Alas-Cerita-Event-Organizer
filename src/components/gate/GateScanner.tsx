@@ -470,6 +470,14 @@ export const GateScanner: React.FC<GateScannerProps> = ({
                       {scanResult.ticket.attendeeName}
                     </span>
                   </div>
+                  {scanResult.ticket.packageName && (
+                    <div className="flex justify-between items-center text-amber-300">
+                      <span>Paket Bundle:</span>
+                      <span className="font-bold text-[11px] bg-amber-950/80 border border-amber-800/80 px-2 py-0.5 rounded">
+                        Paket {scanResult.ticket.packageName} ({scanResult.ticket.packageMemberIndex || 1} dari {scanResult.ticket.packageTotalMembers || 1})
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center text-slate-400">
                     <span>Kategori / Tier:</span>
                     <span className="text-indigo-300 font-bold">
@@ -481,8 +489,8 @@ export const GateScanner: React.FC<GateScannerProps> = ({
                     <span className="text-white font-bold">{scanResult.ticket.ticketNumber}</span>
                   </div>
                   <div className="flex justify-between items-center text-slate-400">
-                    <span>Verifikasi KTP:</span>
-                    <span className="text-slate-200">**{scanResult.ticket.attendeeIdLast4}</span>
+                    <span>NIK Pengunjung:</span>
+                    <span className="text-slate-200 font-semibold">{scanResult.ticket.attendeeNik || ('**' + scanResult.ticket.attendeeIdLast4)}</span>
                   </div>
                   {scanResult.ticket.seat_or_gate && (
                     <div className="flex justify-between items-center text-slate-400">

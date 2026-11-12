@@ -33,8 +33,8 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
   
   // Selected ticket for manual verification
   const [selectedTicket, setSelectedTicket] = useState<IssuedTicket | null>(null);
-  const [inputKTP4, setInputKTP4] = useState<string>('');
-  const [supervisorNote, setSupervisorNote] = useState<string>('Layar HP pengunjung retak, KTP fisik asli diverifikasi.');
+  const [inputNIK, setInputNIK] = useState<string>('');
+  const [supervisorNote, setSupervisorNote] = useState<string>('Layar HP pengunjung retak, identitas NIK asli diverifikasi.');
   const [verificationFeedback, setVerificationFeedback] = useState<{
     success: boolean;
     message: string;
@@ -70,17 +70,17 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
     if (!selectedTicket) return;
     setVerificationFeedback(null);
 
-    if (!inputKTP4.trim() || inputKTP4.trim().length !== 4) {
+    if (!inputNIK.trim() || inputNIK.trim().length < 4) {
       setVerificationFeedback({
         success: false,
-        message: 'Masukkan 4 digit terakhir nomor KTP pengunjung.',
+        message: 'Masukkan NIK pengunjung (16 digit atau minimal 4 digit terakhir).',
       });
       return;
     }
 
     const res = storageService.supervisorManualCheckIn({
       ticketId: selectedTicket.id,
-      enteredIdLast4: inputKTP4.trim(),
+      enteredNik: inputNIK.trim(),
       supervisorNote,
       supervisor: currentUser,
     });
@@ -112,10 +112,10 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
             <span>MODUL HELPDESK & JALUR DARURAT (SUPERVISOR OVERRIDE)</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-1">
-            Verifikasi & Validasi Tiket Manual (KTP)
+            Verifikasi & Validasi Tiket Manual (NIK)
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Jalur darurat apabila QR Code gagal terbaca (layar retak, baterai habis, atau kendala jaringan).
+            Jalur darurat apabila QR Code gagal terbaca (layar retak, baterai habis, atau kendala jaringan). Verifikasi data dengan NIK.
           </p>
         </div>
 
@@ -215,7 +215,7 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
                     key={t.id}
                     onClick={() => {
                       setSelectedTicket(t);
-                      setInputKTP4('');
+                      setInputNIK('');
                       setVerificationFeedback(null);
                     }}
                     className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
@@ -240,12 +240,19 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
                     </div>
 
                     <div className="mt-2 space-y-1">
-                      <span className="text-sm font-bold text-white block">{t.attendeeName}</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-bold text-white block">{t.attendeeName}</span>
+                        {t.packageName && (
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-800/80">
+                            Paket {t.packageName} · Peserta {t.packageMemberIndex || 1} dari {t.packageTotalMembers || 1}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-xs text-slate-400 block">{event?.title} &middot; {t.ticketTypeName}</span>
                     </div>
 
                     <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>4-Digit KTP Tersimpan: **{t.attendeeIdLast4}</span>
+                      <span className="font-mono text-slate-300">NIK: {t.attendeeNik || ('**' + t.attendeeIdLast4)}</span>
                       <span className="text-indigo-400 font-medium">Verifikasi Tiket &rarr;</span>
                     </div>
                   </div>
@@ -255,10 +262,10 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
           )}
         </div>
 
-        {/* Right Column: Physical KTP Verification & Approval Form (lg:col-span-6) */}
+        {/* Right Column: Physical NIK Verification & Approval Form (lg:col-span-6) */}
         <div className="lg:col-span-6 space-y-4">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">
-            Formulir Konfirmasi Supervisor & Verifikasi KTP Fisik
+            Formulir Konfirmasi Supervisor & Verifikasi NIK Fisik
           </span>
 
           {selectedTicket ? (
@@ -273,6 +280,18 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
                 <div className="flex justify-between">
                   <span className="text-slate-400">Nama Pengunjung:</span>
                   <span className="font-bold text-white">{selectedTicket.attendeeName}</span>
+                </div>
+                {selectedTicket.packageName && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Paket Bundle:</span>
+                    <span className="text-amber-300 font-semibold font-mono text-[11px] bg-amber-950/80 border border-amber-800/80 px-2 py-0.5 rounded">
+                      Paket {selectedTicket.packageName} (Peserta {selectedTicket.packageMemberIndex || 1} dari {selectedTicket.packageTotalMembers || 1})
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-slate-400">NIK Terdaftar:</span>
+                  <span className="font-mono font-semibold text-white">{selectedTicket.attendeeNik || ('**' + selectedTicket.attendeeIdLast4)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Tier / Kelas:</span>
@@ -292,23 +311,23 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
                 )}
               </div>
 
-              {/* Form Input: 4 Digits KTP */}
+              {/* Form Input: NIK */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-white block">
-                  Cocokkan 4 Digit Terakhir Nomor KTP Pengunjung (Fisik)
+                  Cocokkan NIK Pengunjung (KTP / Identitas Fisik)
                 </label>
                 <div className="relative">
                   <input
                     type="text"
-                    maxLength={4}
-                    value={inputKTP4}
-                    onChange={(e) => setInputKTP4(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Contoh: 7821"
-                    className="w-full px-4 py-2.5 text-base font-mono tracking-widest bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                    maxLength={16}
+                    value={inputNIK}
+                    onChange={(e) => setInputNIK(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Contoh: 330214... (16 Digit NIK atau 4 digit terakhir)"
+                    className="w-full px-4 py-2.5 text-sm font-mono tracking-wider bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
                 <span className="text-[11px] text-slate-400 block">
-                  Petugas supervisor wajib melihat KTP/SIM/Paspor fisik pengunjung sebelum memasukkan angka.
+                  Petugas supervisor mencocokkan NIK dari KTP/SIM fisik pengunjung dengan sistem sebelum konfirmasi.
                 </span>
               </div>
 

@@ -20,7 +20,7 @@ interface EventCatalogProps {
   events: Event[];
   ticketTypes: TicketType[];
   onSelectEvent: (event: Event, preferredTierId?: string) => void;
-  onOpenConcurrencyDemo: () => void;
+  onOpenConcurrencyDemo?: () => void;
 }
 
 export const EventCatalog: React.FC<EventCatalogProps> = ({
@@ -29,23 +29,9 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
   onSelectEvent,
   onOpenConcurrencyDemo,
 }) => {
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-
   // Primary featured event is Alas Cerita
   const alasCeritaEvent = events.find((e) => e.id === 'evt_alas_cerita_2026') || events[0];
   const alasCeritaTiers = ticketTypes.filter((t) => t.eventId === alasCeritaEvent?.id);
-
-  const categories = ['All', 'Arts', 'Music', 'Technology'];
-
-  const otherEvents = events.filter((evt) => {
-    const matchCategory = selectedCategory === 'All' || evt.category === selectedCategory;
-    const matchSearch =
-      evt.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      evt.venue.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      evt.city.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchCategory && matchSearch;
-  });
 
   const allFacilities = [
     'Jajanan Pasar',
@@ -62,34 +48,40 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
   return (
     <div className="space-y-14 pb-20">
       
-      {/* 1. HERO SECTION: Alas Cerita — Our Philosophy */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-amber-950/40 via-slate-900 to-slate-950 border border-amber-900/40 p-6 sm:p-10 lg:p-12 shadow-2xl">
+      {/* 1. HERO SECTION: Alas Cerita — Our Philosophy (Warm Pink & Yellow Nuance) */}
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#2c1326] via-[#20131e] to-[#2c2010] border border-pink-500/30 p-6 sm:p-10 lg:p-12 shadow-2xl shadow-pink-950/30">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center relative z-10">
           
           {/* Left Text Column */}
           <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Yuk, temukan cerita dan versi terbaik dirimu bersama Alas Cerita!</span>
+            
+            {/* Logo Brand Tag */}
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#271223]/90 border border-pink-500/40 text-stone-200 text-xs font-medium shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-pink-500 animate-pulse" />
+              <span className="text-pink-200 font-semibold">Yuk, temukan cerita dan versi terbaik dirimu bersama Alas Cerita!</span>
             </div>
 
             <div className="space-y-2">
-              <span className="text-xs sm:text-sm font-mono tracking-widest uppercase text-amber-400 block font-semibold">
-                Talkshow: Rerasan Mawi Makna
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-mono tracking-widest uppercase text-[#FACC15] font-black">
+                  Talkshow: Rerasan Mawi Makna
+                </span>
+                <span className="text-pink-400/60">·</span>
+                <span className="text-xs text-pink-300 font-mono font-bold">Alas Cerita EO</span>
+              </div>
               <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
                 “Duduk Sejenak, Leren Kepenak”
               </h1>
             </div>
 
-            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed text-justify sm:text-left">
+            <p className="text-stone-200 text-xs sm:text-sm leading-relaxed text-justify sm:text-left">
               Alas Cerita adalah creative gathering berbasis self-exploration yang menggabungkan refleksi diri, aktivitas kreatif, interaksi sosial, dan pengalaman budaya dalam ruang yang hangat, terbuka, dan inklusif. Berasal dari kata “alas” (hutan dalam bahasa Jawa) dan “cerita”, Alas Cerita menjadi simbol keberagaman perjalanan hidup setiap individu serta ruang untuk berbagi, berekspresi, dan saling terhubung tanpa menghakimi.
             </p>
 
             {/* Date, Time, Venue Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-              <div className="p-3.5 bg-slate-950/70 border border-amber-900/30 rounded-xl">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 block mb-1">
+              <div className="p-3.5 bg-[#200f1c]/90 border border-pink-500/30 rounded-2xl shadow-sm">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-pink-400 block mb-1 font-bold">
                   Hari / Tanggal
                 </span>
                 <span className="text-xs sm:text-sm font-bold text-white block">
@@ -97,8 +89,8 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
                 </span>
               </div>
 
-              <div className="p-3.5 bg-slate-950/70 border border-amber-900/30 rounded-xl">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 block mb-1">
+              <div className="p-3.5 bg-[#251b0e]/90 border border-amber-400/40 rounded-2xl shadow-sm">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 block mb-1 font-bold">
                   Waktu Acara
                 </span>
                 <span className="text-xs sm:text-sm font-bold text-white block">
@@ -106,8 +98,8 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
                 </span>
               </div>
 
-              <div className="p-3.5 bg-slate-950/70 border border-amber-900/30 rounded-xl">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 block mb-1">
+              <div className="p-3.5 bg-[#200f1c]/90 border border-pink-500/30 rounded-2xl shadow-sm">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-pink-300 block mb-1 font-bold">
                   Tempat / Venue
                 </span>
                 <span className="text-xs sm:text-sm font-bold text-white block">
@@ -120,7 +112,7 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
             <div className="pt-2 flex flex-wrap items-center gap-4">
               <button
                 onClick={() => onSelectEvent(alasCeritaEvent)}
-                className="px-6 py-3 bg-amber-600 hover:bg-amber-500 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-lg shadow-amber-600/30 flex items-center gap-2 cursor-pointer"
+                className="px-6 py-3.5 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:brightness-110 text-stone-950 text-xs sm:text-sm font-black rounded-xl transition-all shadow-lg shadow-pink-500/30 flex items-center gap-2 cursor-pointer"
               >
                 <span>Daftar Sekarang</span>
                 <ArrowRight className="w-4 h-4" />
@@ -128,7 +120,7 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
 
               <a
                 href="#paket-tiket"
-                className="px-5 py-3 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition-colors"
+                className="px-5 py-3.5 bg-[#261324]/90 hover:bg-[#34182e] text-pink-100 border border-pink-500/40 text-xs sm:text-sm font-semibold rounded-xl transition-colors"
               >
                 Lihat Paket Tiket
               </a>
@@ -137,46 +129,52 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
 
           {/* Right Poster Column */}
           <div className="lg:col-span-5 relative">
-            <div className="relative rounded-2xl overflow-hidden border border-amber-900/50 shadow-2xl group bg-slate-950">
+            <div className="relative rounded-3xl overflow-hidden border-2 border-pink-500/40 shadow-2xl group bg-[#160b15]">
               <img
                 src={alasCeritaEvent.posterUrl}
                 alt="Poster Alas Cerita — Our Philosophy"
                 referrerPolicy="no-referrer"
                 className="w-full aspect-4/3 sm:aspect-16/10 object-cover group-hover:scale-105 transition-transform duration-700"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#1a0e19] via-[#1a0e19]/25 to-transparent" />
               
-              <div className="absolute bottom-4 left-4 right-4 p-3 bg-slate-950/80 backdrop-blur-md rounded-xl border border-white/10">
-                <span className="text-[11px] font-mono text-amber-300 block font-semibold">
-                  Poster Alas Cerita — Our Philosophy
-                </span>
-                <span className="text-xs text-slate-300">
-                  Kalura Secret Garden &middot; Creative Gathering &amp; Painting
-                </span>
+              <div className="absolute bottom-4 left-4 right-4 p-3.5 bg-[#200f1c]/95 backdrop-blur-md rounded-2xl border border-pink-500/30 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-white p-1 shrink-0 overflow-hidden shadow-sm border border-amber-300">
+                  <img src="/alas-cerita-logo.jpg" alt="Alas Cerita" className="w-full h-full object-contain" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-mono text-[#FACC15] block font-bold">
+                    Poster Alas Cerita — Our Philosophy
+                  </span>
+                  <span className="text-xs text-stone-300">
+                    Kalura Secret Garden &middot; Creative Gathering &amp; Painting
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Ambient glow */}
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        {/* Ambient warm glow in pink and yellow */}
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-pink-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-amber-400/20 rounded-full blur-3xl pointer-events-none" />
       </section>
 
       {/* 2. PILIH PENGALAMANMU — TICKET PACKAGES SHOWCASE */}
       <section id="paket-tiket" className="space-y-6 scroll-mt-24">
         <div className="text-center max-w-2xl mx-auto space-y-2">
-          <span className="text-xs font-mono font-bold uppercase tracking-widest text-amber-400">
-            PILIH PENGALAMANMU
-          </span>
-          <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-gradient-to-r from-pink-950/80 to-amber-950/80 border border-pink-500/40 text-[11px] font-mono font-bold tracking-widest text-pink-300">
+            <span>PILIH PENGALAMANMU</span>
+          </div>
+          <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
             Paket tiket untuk setiap ambisi.
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400">
+          <p className="text-xs sm:text-sm text-stone-300">
             Semua paket mendapat fasilitas yang sama. Pilih berdasarkan jumlah orang yang akan hadir bersamamu.
           </p>
         </div>
 
-        {/* Packages Grid */}
+        {/* Packages Grid: Single, Couple, Circle */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {alasCeritaTiers.map((tier) => {
             const isSingle = tier.name.toLowerCase().includes('single');
@@ -188,14 +186,23 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
                 key={tier.id}
                 className={`relative rounded-3xl p-6 sm:p-8 flex flex-col justify-between border transition-all duration-300 ${
                   isCouple
-                    ? 'bg-gradient-to-b from-amber-950/40 to-slate-900 border-amber-500 shadow-xl shadow-amber-950/30 ring-1 ring-amber-500'
-                    : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                    ? 'bg-gradient-to-b from-[#341d13] via-[#271520] to-[#1a0e18] border-2 border-amber-400 shadow-2xl shadow-amber-950/50 ring-2 ring-amber-400/30'
+                    : isCircle
+                    ? 'bg-gradient-to-b from-[#2d1428] via-[#211220] to-[#1a0e18] border border-pink-400/50 hover:border-pink-300 hover:shadow-xl hover:shadow-pink-950/50'
+                    : 'bg-gradient-to-b from-[#281324] via-[#20121d] to-[#1a0e18] border border-pink-500/35 hover:border-pink-400 hover:shadow-xl hover:shadow-pink-950/50'
                 }`}
               >
                 {/* Popular Tag for Couple */}
                 {isCouple && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1 bg-amber-500 text-slate-950 font-bold text-[10px] tracking-wider uppercase rounded-full shadow-md font-mono">
-                    Paling Favorit (2 Orang)
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-amber-400 to-yellow-300 text-stone-950 font-black text-[10px] tracking-wider uppercase rounded-full shadow-lg font-mono">
+                    ★ Paling Favorit (2 Orang)
+                  </div>
+                )}
+
+                {/* Tag for Circle */}
+                {isCircle && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-pink-500 to-amber-400 text-stone-950 font-black text-[10px] tracking-wider uppercase rounded-full shadow-lg font-mono">
+                    Hemat Bertiga (3 Orang)
                   </div>
                 )}
 
@@ -203,33 +210,48 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
                   {/* Tier Title & Price */}
                   <div>
                     <div className="flex items-center justify-between">
-                      <h3 className="text-xl font-bold text-white">{tier.name}</h3>
-                      <span className="text-xs font-mono text-slate-400">
+                      <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                        <span>{tier.name}</span>
+                        {isSingle && <span className="w-2.5 h-2.5 rounded-full bg-pink-400 shadow-sm shadow-pink-400" />}
+                        {isCouple && <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm shadow-amber-400" />}
+                        {isCircle && <span className="w-2.5 h-2.5 rounded-full bg-pink-300 shadow-sm shadow-pink-300" />}
+                      </h3>
+                      <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${
+                        isSingle 
+                          ? 'bg-pink-950 text-pink-300 border border-pink-600/50' 
+                          : isCouple 
+                          ? 'bg-amber-950 text-amber-300 border border-amber-500/60' 
+                          : 'bg-pink-950 text-pink-200 border border-pink-500/60'
+                      }`}>
                         {isSingle ? '1 Orang' : isCouple ? '2 Orang' : '3 Orang'}
                       </span>
                     </div>
 
                     <div className="mt-3">
-                      <span className="text-3xl font-black text-white font-mono tabular-nums">
+                      <span className={`text-3xl sm:text-4xl font-black font-mono tabular-nums ${isCouple ? 'text-[#FACC15]' : 'text-white'}`}>
                         Rp{tier.price.toLocaleString('id-ID')}
                       </span>
-                      <span className="text-xs text-slate-400 ml-1">/ paket</span>
+                      <span className="text-xs text-stone-300 ml-1">/ paket</span>
                     </div>
 
-                    <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                    <p className="text-xs text-stone-300 mt-2 leading-relaxed">
                       {tier.description}
                     </p>
                   </div>
 
                   {/* 9 Facilities Checklist */}
-                  <div className="space-y-2.5 pt-4 border-t border-slate-800/80">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block font-mono">
+                  <div className="space-y-2.5 pt-4 border-t border-pink-500/20">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#FACC15] block font-mono">
                       Fasilitas Termasuk:
                     </span>
-                    <ul className="space-y-2 text-xs text-slate-300">
+                    <ul className="space-y-2 text-xs text-stone-200">
                       {allFacilities.map((fac, idx) => (
                         <li key={idx} className="flex items-center gap-2.5">
-                          <div className="w-4 h-4 rounded-full bg-emerald-950 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                          <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                            isCouple 
+                              ? 'bg-amber-950/80 border border-amber-400/60 text-amber-300' 
+                              : 'bg-pink-950/80 border border-pink-500/60 text-pink-300'
+                          }`}>
                             <Check className="w-2.5 h-2.5" />
                           </div>
                           <span>{fac}</span>
@@ -243,22 +265,17 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
                 <div className="pt-8">
                   <button
                     onClick={() => onSelectEvent(alasCeritaEvent, tier.id)}
-                    className={`w-full py-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md ${
+                    className={`w-full py-3.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md ${
                       isCouple
-                        ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20'
-                        : 'bg-slate-800 hover:bg-slate-700 text-white'
+                        ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-pink-500 hover:brightness-110 text-stone-950 font-black shadow-amber-500/30'
+                        : isCircle
+                        ? 'bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:brightness-110 text-stone-950 font-black shadow-pink-500/30'
+                        : 'bg-gradient-to-r from-pink-600 to-rose-500 hover:brightness-110 text-white font-bold shadow-pink-600/30'
                     }`}
                   >
                     <span>Pilih {tier.name}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
-
-                  <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 font-mono">
-                    <span>Sisa Kuota:</span>
-                    <span className={tier.availableQuota < 20 ? 'text-amber-400 font-bold' : 'text-emerald-400'}>
-                      {tier.availableQuota} paket
-                    </span>
-                  </div>
                 </div>
               </div>
             );
@@ -266,100 +283,28 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
         </div>
       </section>
 
-      {/* 3. TECHNICAL VERIFICATION & WAR TIKET BANNER */}
-      <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-            <Zap className="w-5 h-5" />
+      {/* 3. OFFICIAL PAYMENT & ADMISSION GUARANTEE BANNER */}
+      <div className="p-6 bg-gradient-to-r from-[#2a1323] via-[#21141c] to-[#2c2010] border border-pink-500/30 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl shadow-pink-950/20">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-pink-500/15 border border-pink-500/30 flex items-center justify-center text-pink-400 shrink-0">
+            <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
             <h4 className="text-sm font-bold text-white">
-              Sistem Validasi Gate &amp; Anti-Overselling Berbasis Laravel 11/12
+              Metode Pembayaran Resmi: QRIS, ShopeePay, dan Bank BRI
             </h4>
-            <p className="text-xs text-slate-400">
-              Didukung Pessimistic Locking (lockForUpdate) untuk mengunci kuota tiket secara akurat &amp; Anti-Double Scan.
+            <p className="text-xs text-stone-300">
+              E-Ticket diterbitkan seketika dengan QR Code terenkripsi dan nomor tiket unik untuk verifikasi pintu masuk Kalura Secret Garden.
             </p>
           </div>
         </div>
 
-        <button
-          onClick={onOpenConcurrencyDemo}
-          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 text-xs font-semibold rounded-xl transition-colors shrink-0 cursor-pointer"
-        >
-          Uji Simulasi War Tiket &rarr;
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-950/80 border border-amber-500/60 px-3.5 py-1.5 rounded-xl uppercase tracking-wider shadow-sm">
+            100% Tiket Resmi
+          </span>
+        </div>
       </div>
-
-      {/* 4. OTHER ACTIVE EVENTS SECTION */}
-      {otherEvents.length > 1 && (
-        <section className="space-y-6 pt-6 border-t border-slate-900">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-bold text-white">Event Lainnya di Platform</h3>
-              <p className="text-xs text-slate-400">Pilihan konser musik dan konferensi teknologi mendatang.</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {otherEvents
-              .filter((e) => e.id !== 'evt_alas_cerita_2026')
-              .map((event) => {
-                const eventTiers = ticketTypes.filter((t) => t.eventId === event.id);
-                const minPrice = eventTiers.length > 0 ? Math.min(...eventTiers.map((t) => t.price)) : 0;
-                const totalRemaining = eventTiers.reduce((acc, t) => acc + t.availableQuota, 0);
-
-                return (
-                  <div
-                    key={event.id}
-                    className="group bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-slate-700 transition-all flex flex-col justify-between"
-                  >
-                    <div className="relative aspect-video w-full overflow-hidden bg-slate-950">
-                      <img
-                        src={event.posterUrl}
-                        alt={event.title}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
-                      <div className="absolute top-3 left-3 text-xs">
-                        <span className="bg-slate-950/80 backdrop-blur-md px-2.5 py-1 rounded-md border border-slate-800 text-[11px] font-medium text-white">
-                          {event.category}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-6 space-y-4">
-                      <div>
-                        <h4 className="text-lg font-bold text-white group-hover:text-amber-400 transition-colors line-clamp-1">
-                          {event.title}
-                        </h4>
-                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-                          {event.description}
-                        </p>
-                      </div>
-
-                      <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">Mulai dari</span>
-                          <span className="text-base font-bold text-white font-mono">
-                            Rp {minPrice.toLocaleString('id-ID')}
-                          </span>
-                        </div>
-
-                        <button
-                          onClick={() => onSelectEvent(event)}
-                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                        >
-                          Lihat Detail
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        </section>
-      )}
     </div>
   );
 };

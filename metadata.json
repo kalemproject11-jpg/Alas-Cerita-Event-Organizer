@@ -1,6 +1,10 @@
 {
-  "name": "EventPass — E-Ticket & Gate Validation System",
-  "description": "Sistem Pemesanan & Validasi E-Ticket Event dengan QR Code Terenkripsi, Anti-Double Scan, Concurrency Locking, dan Helpdesk Supervisor.",
-  "requestFramePermissions": ["camera"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "name": "Alas Cerita Event Organizer — E-Ticket & Gate Validation",
+  "description": "Sistem Pemesanan & Validasi E-Ticket Alas Cerita Talkshow Rerasan Mawi Makna dengan Gate Scanner QR, Dashboard Terpadu Admin, dan Anti-Double Scan.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

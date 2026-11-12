@@ -22,7 +22,7 @@ interface AdminDashboardProps {
   bookings: Booking[];
   issuedTickets: IssuedTicket[];
   logs: CheckInLog[];
-  onOpenConcurrencyDemo: () => void;
+  onOpenConcurrencyDemo?: () => void;
   onOpenAuditLogs: () => void;
 }
 
@@ -148,13 +148,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            onClick={onOpenConcurrencyDemo}
-            className="px-3.5 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-600/40 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
-          >
-            <Zap className="w-4 h-4 text-amber-400" />
-            <span>Simulasi War Tiket (lockForUpdate)</span>
-          </button>
 
           <button
             onClick={() => setShowNewEventModal(true)}

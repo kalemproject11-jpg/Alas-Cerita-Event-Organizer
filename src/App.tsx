@@ -5,13 +5,10 @@ import { Header } from './components/Header';
 import { EventCatalog } from './components/customer/EventCatalog';
 import { EventDetailModal } from './components/customer/EventDetailModal';
 import { CheckoutPaymentModal } from './components/customer/CheckoutPaymentModal';
-import { MyTicketsView } from './components/customer/MyTicketsView';
-import { GateScanner } from './components/gate/GateScanner';
-import { SupervisorHelpdesk } from './components/gate/SupervisorHelpdesk';
-import { AuditLogsView } from './components/gate/AuditLogsView';
-import { AdminDashboard } from './components/admin/AdminDashboard';
-import { ConcurrencySimulatorModal } from './components/admin/ConcurrencySimulatorModal';
-import { ShieldCheck, Database, QrCode, Terminal, CheckCircle2 } from 'lucide-react';
+import { ETicketModal } from './components/customer/ETicketModal';
+import { AdminAuthModal } from './components/admin/AdminAuthModal';
+import { AdminUnifiedDashboard } from './components/admin/AdminUnifiedDashboard';
+import { CheckCircle2, Ticket } from 'lucide-react';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User>(() => storageService.getCurrentUser());
@@ -22,17 +19,18 @@ export default function App() {
   const [issuedTickets, setIssuedTickets] = useState<IssuedTicket[]>(() => storageService.getIssuedTickets());
   const [logs, setLogs] = useState<CheckInLog[]>(() => storageService.getLogs());
 
-  // Navigation tab: 'catalog' | 'my-tickets' | 'scanner' | 'helpdesk' | 'admin' | 'logs'
+  // Active navigation: 'catalog' | 'admin_dashboard'
   const [activeTab, setActiveTab] = useState<string>('catalog');
 
-  // Modals
+  // Modals state
+  const [showAdminAuthModal, setShowAdminAuthModal] = useState<boolean>(false);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<Event | null>(null);
   const [preferredTierId, setPreferredTierId] = useState<string | undefined>(undefined);
   const [activeBookingForPayment, setActiveBookingForPayment] = useState<Booking | null>(null);
-  const [showConcurrencySimulator, setShowConcurrencySimulator] = useState<boolean>(false);
   const [initialTicketToScan, setInitialTicketToScan] = useState<IssuedTicket | null>(null);
+  const [customerSuccessTicket, setCustomerSuccessTicket] = useState<IssuedTicket | null>(null);
 
-  // Subscribe to storage changes
+  // Subscribe to storage updates
   useEffect(() => {
     const unsubscribe = storageService.subscribe(() => {
       setCurrentUser(storageService.getCurrentUser());
@@ -46,20 +44,35 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Switch role / active user
+  // When switching user or logging in
   const handleSwitchUser = (userId: string) => {
     storageService.setCurrentUser(userId);
     const user = users.find((u) => u.id === userId);
     if (user) {
-      // Auto route to relevant tab for role
-      if (user.role === 'gate_staff') {
-        setActiveTab('scanner');
-      } else if (user.role === 'gate_supervisor') {
-        setActiveTab('helpdesk');
-      } else if (user.role === 'super_admin') {
-        setActiveTab('admin');
+      setCurrentUser(user);
+      if (user.role !== 'customer') {
+        setActiveTab('admin_dashboard');
+      } else {
+        setActiveTab('catalog');
       }
     }
+  };
+
+  const handleAdminLoginSuccess = (adminUser: User) => {
+    storageService.setCurrentUser(adminUser.id);
+    setCurrentUser(adminUser);
+    setActiveTab('admin_dashboard');
+    setShowAdminAuthModal(false);
+  };
+
+  const handleLogoutAdmin = () => {
+    // Revert to customer account
+    const customerUser = users.find((u) => u.role === 'customer') || users[1];
+    if (customerUser) {
+      storageService.setCurrentUser(customerUser.id);
+      setCurrentUser(customerUser);
+    }
+    setActiveTab('catalog');
   };
 
   const handleProceedToCheckout = (payload: {
@@ -86,12 +99,21 @@ export default function App() {
 
   const handlePaymentSuccess = () => {
     setActiveBookingForPayment(null);
-    setActiveTab('my-tickets');
+    setCustomerSuccessTicket(null);
+
+    if (currentUser.role !== 'customer') {
+      setActiveTab('admin_dashboard');
+    }
   };
 
   const handleOpenGateScannerWithTicket = (ticket: IssuedTicket) => {
     setInitialTicketToScan(ticket);
-    setActiveTab('scanner');
+    // If not admin, require admin login first
+    if (currentUser.role === 'customer') {
+      setShowAdminAuthModal(true);
+    } else {
+      setActiveTab('admin_dashboard');
+    }
   };
 
   const handleResetData = () => {
@@ -101,20 +123,39 @@ export default function App() {
     }
   };
 
+  const isAdminOrStaff = currentUser.role !== 'customer';
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Top Bar Header */}
+    <div className="min-h-screen bg-gradient-to-br from-[#1c0f1c] via-[#261421] to-[#22170f] text-stone-100 flex flex-col font-sans selection:bg-pink-500/40 selection:text-pink-200 relative overflow-x-hidden">
+      {/* Radiant ambient glow in pink & yellow */}
+      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+        <div className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full bg-pink-500/15 blur-[120px]" />
+        <div className="absolute top-1/3 -right-32 w-[500px] h-[500px] rounded-full bg-amber-400/15 blur-[120px]" />
+        <div className="absolute -bottom-32 left-1/4 w-[600px] h-[600px] rounded-full bg-rose-500/12 blur-[130px]" />
+      </div>
+
+      {/* Top Bar Header with Alas Cerita Branding & Auth Gate */}
       <Header
         currentUser={currentUser}
         onSwitchUser={handleSwitchUser}
         users={users}
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={(tab) => {
+          if (tab === 'admin_dashboard' && !isAdminOrStaff) {
+            setShowAdminAuthModal(true);
+          } else {
+            setActiveTab(tab);
+          }
+        }}
         onResetData={handleResetData}
+        onOpenAdminLogin={() => setShowAdminAuthModal(true)}
+        onLogoutAdmin={handleLogoutAdmin}
       />
 
-      {/* Main Content Viewport */}
+      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        
+        {/* PUBLIC VIEW: Event Catalog & Ticket Booking */}
         {activeTab === 'catalog' && (
           <EventCatalog
             events={events}
@@ -123,58 +164,55 @@ export default function App() {
               setSelectedEventForDetail(evt);
               setPreferredTierId(tierId);
             }}
-            onOpenConcurrencyDemo={() => setShowConcurrencySimulator(true)}
           />
         )}
 
-        {activeTab === 'my-tickets' && (
-          <MyTicketsView
+        {/* ADMIN UNIFIED DASHBOARD: Only accessible by authenticated Admin/Staff */}
+        {activeTab === 'admin_dashboard' && isAdminOrStaff && (
+          <AdminUnifiedDashboard
             currentUser={currentUser}
-            tickets={issuedTickets}
-            events={events}
-            onOpenGateScannerWithTicket={handleOpenGateScannerWithTicket}
-          />
-        )}
-
-        {activeTab === 'scanner' && (
-          <GateScanner
-            currentUser={currentUser}
-            tickets={issuedTickets}
-            initialTicketToScan={initialTicketToScan}
-            onClearInitialTicket={() => setInitialTicketToScan(null)}
-            onOpenSupervisorHelpdesk={() => setActiveTab('helpdesk')}
-          />
-        )}
-
-        {activeTab === 'helpdesk' && (
-          <SupervisorHelpdesk
-            currentUser={currentUser}
-            events={events}
-            onOpenAuditLogs={() => setActiveTab('logs')}
-          />
-        )}
-
-        {activeTab === 'admin' && (
-          <AdminDashboard
+            users={users}
             events={events}
             ticketTypes={ticketTypes}
             bookings={bookings}
             issuedTickets={issuedTickets}
             logs={logs}
-            onOpenConcurrencyDemo={() => setShowConcurrencySimulator(true)}
-            onOpenAuditLogs={() => setActiveTab('logs')}
+            initialTicketToScan={initialTicketToScan}
+            onClearInitialTicket={() => setInitialTicketToScan(null)}
+            onOpenGateScannerWithTicket={handleOpenGateScannerWithTicket}
+            onLogoutToPublic={handleLogoutAdmin}
           />
         )}
 
-        {activeTab === 'logs' && (
-          <AuditLogsView
-            logs={logs}
-            onBack={() => setActiveTab('helpdesk')}
-          />
+        {/* Protection fallback if non-admin somehow hits admin_dashboard tab */}
+        {activeTab === 'admin_dashboard' && !isAdminOrStaff && (
+          <div className="p-12 text-center bg-stone-900/60 rounded-3xl border border-stone-800 space-y-4 max-w-md mx-auto my-12">
+            <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/30 text-[#FA7022] flex items-center justify-center mx-auto">
+              <Ticket className="w-8 h-8" />
+            </div>
+            <h2 className="text-xl font-bold text-white">Akses Dibatasi</h2>
+            <p className="text-xs text-stone-400">
+              Dashboard Gate Scanner dan Manajemen Tiket hanya dapat diakses oleh Admin dan Petugas resmi Alas Cerita.
+            </p>
+            <button
+              onClick={() => setShowAdminAuthModal(true)}
+              className="px-6 py-2.5 bg-[#FA7022] hover:bg-[#e05e13] text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-orange-500/30 cursor-pointer"
+            >
+              Login Admin Sekarang (admin / admin)
+            </button>
+          </div>
         )}
       </main>
 
-      {/* Modals */}
+      {/* Admin Authentication Modal: username: admin / password: admin */}
+      <AdminAuthModal
+        isOpen={showAdminAuthModal}
+        onClose={() => setShowAdminAuthModal(false)}
+        onSuccessLogin={handleAdminLoginSuccess}
+        users={users}
+      />
+
+      {/* Event Detail & Tier Selection Modal */}
       {selectedEventForDetail && (
         <EventDetailModal
           event={selectedEventForDetail}
@@ -189,6 +227,7 @@ export default function App() {
         />
       )}
 
+      {/* Checkout & Payment Gateway Simulator */}
       {activeBookingForPayment && (
         <CheckoutPaymentModal
           booking={activeBookingForPayment}
@@ -201,27 +240,35 @@ export default function App() {
         />
       )}
 
-      {showConcurrencySimulator && (
-        <ConcurrencySimulatorModal
-          onClose={() => setShowConcurrencySimulator(false)}
+      {/* Customer E-Ticket Preview Modal (Shown right after successful checkout) */}
+      {customerSuccessTicket && (
+        <ETicketModal
+          ticket={customerSuccessTicket}
+          event={events.find((e) => e.id === customerSuccessTicket.eventId) || events[0]}
+          onClose={() => setCustomerSuccessTicket(null)}
         />
       )}
 
-      {/* Quiet Technical Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/90 py-8 px-4 text-xs text-slate-500 mt-auto no-print">
+      {/* Quiet Technical Footer with Alas Cerita Branding */}
+      <footer className="border-t border-pink-900/30 bg-[#170b16]/90 py-8 px-4 text-xs text-stone-400 mt-auto no-print backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-300">EventPass Engine</span>
+            <span className="font-bold text-pink-400">Alas Cerita Event Organizer</span>
             <span>&middot;</span>
-            <span>Sistem Pemesanan &amp; Validasi E-Ticket Berbasis PHP Laravel 11/12 &amp; QR Code Terenkripsi</span>
+            <span className="text-yellow-300/90 font-medium">Sistem Pemesanan &amp; Validasi E-Ticket Resmi</span>
           </div>
 
-          <div className="flex items-center gap-4 text-[11px] font-mono text-slate-400">
-            <span>UUID v4 Cryptographic Tokens</span>
+          <div className="flex items-center gap-4 text-[11px] font-mono text-stone-400">
+            <span>UUID v4 Encrypted QR</span>
             <span>&middot;</span>
-            <span>lockForUpdate Pessimistic Locking</span>
+            <span>Anti-Double Scan Engine</span>
             <span>&middot;</span>
-            <span>Anti-Double Scan</span>
+            <button
+              onClick={() => setShowAdminAuthModal(true)}
+              className="text-pink-400 hover:text-yellow-300 transition-colors underline cursor-pointer"
+            >
+              Login Admin (admin / admin)
+            </button>
           </div>
         </div>
       </footer>

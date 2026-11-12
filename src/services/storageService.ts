@@ -1,15 +1,18 @@
 import { User, Event, TicketType, Booking, IssuedTicket, CheckInLog, CheckInResult, PaymentMethod } from '../types';
-import { INITIAL_USERS, INITIAL_EVENTS, INITIAL_TICKET_TYPES, INITIAL_BOOKINGS, INITIAL_ISSUED_TICKETS, INITIAL_LOGS } from '../data/mockData';
+import { INITIAL_USERS, INITIAL_EVENTS, INITIAL_TICKET_TYPES, INITIAL_BOOKINGS, INITIAL_ISSUED_TICKETS, INITIAL_LOGS, ALAS_CERITA_PERKS } from '../data/mockData';
+import { db } from '../firebase';
+import { collection, doc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot } from 'firebase/firestore';
 
 const STORAGE_KEYS = {
-  USERS: 'eventpass_users_v2',
-  CURRENT_USER_ID: 'eventpass_current_user_id_v2',
-  EVENTS: 'eventpass_events_v2',
-  TICKET_TYPES: 'eventpass_ticket_types_v2',
-  BOOKINGS: 'eventpass_bookings_v2',
-  ISSUED_TICKETS: 'eventpass_issued_tickets_v2',
-  LOGS: 'eventpass_check_in_logs_v2',
-  RATE_LIMIT_ATTEMPTS: 'eventpass_supervisor_rate_limit_v2',
+  USERS: 'eventpass_users_v3',
+  CURRENT_USER_ID: 'eventpass_current_user_id_v3',
+  EVENTS: 'eventpass_events_v3',
+  TICKET_TYPES: 'eventpass_ticket_types_v3',
+  BOOKINGS: 'eventpass_bookings_v3',
+  ISSUED_TICKETS: 'eventpass_issued_tickets_v3',
+  LOGS: 'eventpass_check_in_logs_v3',
+  RATE_LIMIT_ATTEMPTS: 'eventpass_supervisor_rate_limit_v3',
+  SIMULATION_CLEARED: 'alas_cerita_simulation_cleared_v1',
 };
 
 // Safe alphanumeric character set for visual ticket_number (omits ambiguous 0, O, 1, I)
@@ -36,13 +39,69 @@ function generateUUID(): string {
 
 class StorageService {
   private listeners: Set<() => void> = new Set();
+  private isFirestoreSynced = false;
 
   constructor() {
     this.initializeDefaults();
+    this.initFirestoreSync();
+  }
+
+  private initFirestoreSync() {
+    if (typeof window === 'undefined' || this.isFirestoreSynced) return;
+    this.isFirestoreSynced = true;
+
+    try {
+      const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
+
+      // 1. Listen to Ticket Types and live quotas
+      onSnapshot(collection(db, 'ticketTypes'), (snapshot) => {
+        if (!snapshot.empty) {
+          const list: TicketType[] = [];
+          snapshot.forEach((d) => list.push(d.data() as TicketType));
+          localStorage.setItem(STORAGE_KEYS.TICKET_TYPES, JSON.stringify(list));
+          this.notify();
+        } else if (!isCleared) {
+          // Seed initial tiers to Firestore once
+          INITIAL_TICKET_TYPES.forEach((tt) => {
+            setDoc(doc(db, 'ticketTypes', tt.id), tt).catch(() => {});
+          });
+        }
+      }, (err) => console.warn('Firestore ticketTypes sync notice:', err.message));
+
+      // 2. Listen to Bookings (real-time reflection of orders)
+      onSnapshot(collection(db, 'bookings'), (snapshot) => {
+        const list: Booking[] = [];
+        snapshot.forEach((d) => list.push(d.data() as Booking));
+        localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(list));
+        this.notify();
+      }, (err) => console.warn('Firestore bookings sync notice:', err.message));
+
+      // 3. Listen to Issued Tickets (real-time check-in and multi-device ticket pool)
+      onSnapshot(collection(db, 'issuedTickets'), (snapshot) => {
+        const list: IssuedTicket[] = [];
+        snapshot.forEach((d) => list.push(d.data() as IssuedTicket));
+        localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(list));
+        this.notify();
+      }, (err) => console.warn('Firestore issuedTickets sync notice:', err.message));
+
+      // 4. Listen to Gate Check-In Logs
+      onSnapshot(collection(db, 'checkInLogs'), (snapshot) => {
+        const list: CheckInLog[] = [];
+        snapshot.forEach((d) => list.push(d.data() as CheckInLog));
+        // Sort latest first
+        list.sort((a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime());
+        localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(list.slice(0, 150)));
+        this.notify();
+      }, (err) => console.warn('Firestore checkInLogs sync notice:', err.message));
+    } catch (e) {
+      console.warn('Firestore sync setup failed, operating on local cache:', e);
+    }
   }
 
   private initializeDefaults() {
     if (typeof window === 'undefined') return;
+    const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
+
     if (!localStorage.getItem(STORAGE_KEYS.EVENTS)) {
       localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(INITIAL_EVENTS));
     }
@@ -50,10 +109,10 @@ class StorageService {
       localStorage.setItem(STORAGE_KEYS.TICKET_TYPES, JSON.stringify(INITIAL_TICKET_TYPES));
     }
     if (!localStorage.getItem(STORAGE_KEYS.BOOKINGS)) {
-      localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(INITIAL_BOOKINGS));
+      localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(isCleared ? [] : INITIAL_BOOKINGS));
     }
     if (!localStorage.getItem(STORAGE_KEYS.ISSUED_TICKETS)) {
-      localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(INITIAL_ISSUED_TICKETS));
+      localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(isCleared ? [] : INITIAL_ISSUED_TICKETS));
     }
     if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
@@ -62,7 +121,7 @@ class StorageService {
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_admin');
     }
     if (!localStorage.getItem(STORAGE_KEYS.LOGS)) {
-      localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(INITIAL_LOGS));
+      localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(isCleared ? [] : INITIAL_LOGS));
     }
   }
 
@@ -79,6 +138,7 @@ class StorageService {
 
   public resetAllData() {
     if (typeof window === 'undefined') return;
+    localStorage.removeItem(STORAGE_KEYS.SIMULATION_CLEARED);
     localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(INITIAL_EVENTS));
     localStorage.setItem(STORAGE_KEYS.TICKET_TYPES, JSON.stringify(INITIAL_TICKET_TYPES));
     localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(INITIAL_BOOKINGS));
@@ -86,7 +146,113 @@ class StorageService {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
     localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(INITIAL_LOGS));
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_admin');
+
+    // Reset cloud Firestore documents to fresh seed
+    INITIAL_TICKET_TYPES.forEach((tt) => {
+      setDoc(doc(db, 'ticketTypes', tt.id), tt).catch(() => {});
+    });
+    INITIAL_ISSUED_TICKETS.forEach((t) => {
+      setDoc(doc(db, 'issuedTickets', t.id), t).catch(() => {});
+    });
+    INITIAL_BOOKINGS.forEach((b) => {
+      setDoc(doc(db, 'bookings', b.id), b).catch(() => {});
+    });
+
     this.notify();
+  }
+
+  /**
+   * Clears ALL simulation/dummy data permanently for live production use:
+   * - Empties bookings (0 orders)
+   * - Empties issued tickets (0 attendees)
+   * - Empties gate check-in logs
+   * - Restores ticket types to pristine 100% full capacity
+   * - Cleans cloud Firestore documents
+   */
+  public async clearAllSimulationData(): Promise<{ success: boolean; message: string }> {
+    if (typeof window === 'undefined') return { success: true, message: 'Data simulasi telah dibersihkan.' };
+
+    // 1. Mark simulation as cleared permanently
+    localStorage.setItem(STORAGE_KEYS.SIMULATION_CLEARED, 'true');
+
+    // 2. Clear bookings, issuedTickets, logs in localStorage
+    localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify([]));
+
+    // 3. Reset ticket tiers to full pristine quotas (ready for 100% production sales)
+    const pristineTiers: TicketType[] = [
+      {
+        id: 'tt_alas_single',
+        eventId: 'evt_alas_cerita_2026',
+        name: 'Single',
+        price: 80000,
+        quota: 120,
+        availableQuota: 120,
+        heldQuota: 0,
+        saleStart: '2026-11-01T00:00:00Z',
+        saleEnd: '2026-12-04T23:59:59Z',
+        description: 'Paket untuk 1 orang peserta. Semua paket mendapat fasilitas lengkap yang sama.',
+        perks: ALAS_CERITA_PERKS,
+      },
+      {
+        id: 'tt_alas_couple',
+        eventId: 'evt_alas_cerita_2026',
+        name: 'Couple',
+        price: 155000,
+        quota: 70,
+        availableQuota: 70,
+        heldQuota: 0,
+        saleStart: '2026-11-01T00:00:00Z',
+        saleEnd: '2026-12-04T23:59:59Z',
+        description: 'Paket untuk 2 orang hadir bersama. Semua paket mendapat fasilitas lengkap yang sama.',
+        perks: ALAS_CERITA_PERKS,
+      },
+      {
+        id: 'tt_alas_circle',
+        eventId: 'evt_alas_cerita_2026',
+        name: 'Circle',
+        price: 225000,
+        quota: 50,
+        availableQuota: 50,
+        heldQuota: 0,
+        saleStart: '2026-11-01T00:00:00Z',
+        saleEnd: '2026-12-04T23:59:59Z',
+        description: 'Paket untuk 3 orang / circle hadir bersama. Semua paket mendapat fasilitas lengkap yang sama.',
+        perks: ALAS_CERITA_PERKS,
+      },
+    ];
+    localStorage.setItem(STORAGE_KEYS.TICKET_TYPES, JSON.stringify(pristineTiers));
+
+    // 4. Delete Firestore simulation documents in cloud
+    try {
+      for (const tier of pristineTiers) {
+        await setDoc(doc(db, 'ticketTypes', tier.id), tier);
+      }
+
+      const bookingsSnap = await getDocs(collection(db, 'bookings'));
+      for (const d of bookingsSnap.docs) {
+        await deleteDoc(doc(db, 'bookings', d.id));
+      }
+
+      const ticketsSnap = await getDocs(collection(db, 'issuedTickets'));
+      for (const d of ticketsSnap.docs) {
+        await deleteDoc(doc(db, 'issuedTickets', d.id));
+      }
+
+      const logsSnap = await getDocs(collection(db, 'checkInLogs'));
+      for (const d of logsSnap.docs) {
+        await deleteDoc(doc(db, 'checkInLogs', d.id));
+      }
+    } catch (e) {
+      console.warn('Firestore cloud cleanup notification:', e);
+    }
+
+    this.notify();
+    return { 
+      success: true, 
+      message: 'Seluruh data simulasi berhasil dihapus. Dashboard transaksi dan peserta kini kosong dan siap digunakan untuk penjualan tiket asli!' 
+    };
   }
 
   // --- Users & Current Active Role ---
@@ -164,11 +330,51 @@ class StorageService {
   // --- Bookings & Concurrency Quota Hold (FR-BKG-02) ---
   public getBookings(): Booking[] {
     try {
+      const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
       const data = localStorage.getItem(STORAGE_KEYS.BOOKINGS);
-      return data ? JSON.parse(data) : INITIAL_BOOKINGS;
+      if (data !== null) return JSON.parse(data);
+      return isCleared ? [] : INITIAL_BOOKINGS;
     } catch {
-      return INITIAL_BOOKINGS;
+      return [];
     }
+  }
+
+  /**
+   * Delete a single booking and all its associated issued tickets from local & Firestore
+   */
+  public async deleteBooking(bookingId: string): Promise<{ success: boolean; message: string }> {
+    const currentBookings = this.getBookings();
+    const targetBooking = currentBookings.find((b) => b.id === bookingId);
+    const updatedBookings = currentBookings.filter((b) => b.id !== bookingId);
+    localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(updatedBookings));
+
+    // Also remove associated issued tickets
+    const currentTickets = this.getIssuedTickets();
+    const ticketsToDelete = currentTickets.filter((t) => t.bookingId === bookingId);
+    const remainingTickets = currentTickets.filter((t) => t.bookingId !== bookingId);
+    localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(remainingTickets));
+
+    // Also remove checkInLogs for those tickets
+    const currentLogs = this.getLogs();
+    const ticketIdsToDelete = new Set(ticketsToDelete.map((t) => t.id));
+    const remainingLogs = currentLogs.filter((l) => !l.issuedTicketId || !ticketIdsToDelete.has(l.issuedTicketId));
+    localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(remainingLogs));
+
+    // Delete in Firestore
+    try {
+      await deleteDoc(doc(db, 'bookings', bookingId));
+      for (const t of ticketsToDelete) {
+        await deleteDoc(doc(db, 'issuedTickets', t.id));
+      }
+    } catch (err) {
+      console.warn('Firestore single booking deletion warning:', err);
+    }
+
+    this.notify();
+    return {
+      success: true,
+      message: `Transaksi ${targetBooking?.invoiceCode || bookingId} beserta ${ticketsToDelete.length} tiket terkait berhasil dihapus.`,
+    };
   }
 
   /**
@@ -244,7 +450,12 @@ class StorageService {
    * Changes payment_status to 'paid', converts held quota to permanently sold,
    * and generates issued_tickets with dual identity (qr_token UUID + ticket_number 8-char).
    */
-  public completePayment(bookingId: string, paymentMethod: PaymentMethod = 'qris'): { success: boolean; error?: string } {
+  public completePayment(
+    bookingId: string, 
+    paymentMethod: PaymentMethod = 'qris',
+    paymentProofUrl?: string,
+    senderName?: string
+  ): { success: boolean; error?: string } {
     const bookings = this.getBookings();
     const bIndex = bookings.findIndex((b) => b.id === bookingId);
     if (bIndex === -1) return { success: false, error: 'Transaksi booking tidak ditemukan.' };
@@ -254,7 +465,15 @@ class StorageService {
 
     const now = new Date().toISOString();
     booking.paymentStatus = 'paid';
+    booking.verificationStatus = 'pending_verification';
     booking.paymentMethod = paymentMethod;
+    if (paymentProofUrl) {
+      booking.paymentProofUrl = paymentProofUrl;
+      booking.proofUploadedAt = now;
+    }
+    if (senderName) {
+      booking.senderName = senderName;
+    }
     booking.paidAt = now;
     bookings[bIndex] = booking;
     localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings));
@@ -269,13 +488,14 @@ class StorageService {
 
     // Generate Issued Tickets
     const storedAttendees = sessionStorage.getItem(`booking_attendees_${booking.id}`);
-    const attendeesList: Array<{ name: string; email: string; phone: string; idLast4: string }> = storedAttendees
+    const attendeesList: Array<{ name: string; email: string; phone: string; nik?: string; idLast4?: string }> = storedAttendees
       ? JSON.parse(storedAttendees)
       : Array.from({ length: booking.quantity }).map((_, i) => ({
           name: `${booking.customerName} #${i + 1}`,
           email: booking.customerEmail,
           phone: booking.customerPhone,
-          idLast4: '8899',
+          nik: '347101230495000' + (i + 1),
+          idLast4: '000' + (i + 1),
         }));
 
     const ticketType = ticketTypes.find((t) => t.id === booking.ticketTypeId);
@@ -283,6 +503,7 @@ class StorageService {
     const newIssued: IssuedTicket[] = [];
 
     attendeesList.forEach((att, idx) => {
+      const nik = att.nik || att.idLast4 || `347101230495000${idx + 1}`;
       newIssued.push({
         id: `tkt_${Date.now()}_${idx}`,
         bookingId: booking.id,
@@ -292,17 +513,68 @@ class StorageService {
         attendeeName: att.name,
         attendeeEmail: att.email,
         attendeePhone: att.phone,
-        attendeeIdLast4: att.idLast4 || '1234',
+        attendeeNik: nik,
+        attendeeIdLast4: nik.slice(-4),
+        packageName: ticketType?.name || 'Single',
+        packageMemberIndex: idx + 1,
+        packageTotalMembers: attendeesList.length,
+        packageGroupName: `Paket ${ticketType?.name || 'Tiket'} (${attendeesList.length} Orang)`,
         ticketNumber: generateRandomTicketNumber(),
         qrToken: generateUUID(),
         status: 'valid',
-        seat_or_gate: 'Gate Utama - Festival Area',
+        verificationStatus: 'pending_verification',
+        seat_or_gate: `Gate Utama Kalura Garden - Area ${ticketType?.name || 'Workshop'}`,
       });
     });
 
     localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify([...newIssued, ...existingIssued]));
+
+    // Sync to Firestore for real-time multi-device reflection
+    newIssued.forEach((t) => {
+      setDoc(doc(db, 'issuedTickets', t.id), t).catch(() => {});
+    });
+    setDoc(doc(db, 'bookings', booking.id), booking).catch(() => {});
+    if (ttIndex >= 0 && ticketTypes[ttIndex]) {
+      setDoc(doc(db, 'ticketTypes', ticketTypes[ttIndex].id), ticketTypes[ttIndex]).catch(() => {});
+    }
+
     this.notify();
     return { success: true };
+  }
+
+  /**
+   * Admin approves and verifies booking payment proof, activating official E-Tickets
+   */
+  public verifyBookingAndTickets(bookingId: string, adminUser: User): { success: boolean; message: string } {
+    const bookings = this.getBookings();
+    const bIndex = bookings.findIndex((b) => b.id === bookingId);
+    const now = new Date().toISOString();
+    if (bIndex >= 0) {
+      bookings[bIndex].verificationStatus = 'verified';
+      bookings[bIndex].verifiedAt = now;
+      bookings[bIndex].verifiedBy = adminUser.name;
+      localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings));
+      setDoc(doc(db, 'bookings', bookingId), bookings[bIndex]).catch(() => {});
+    }
+
+    const allTickets = this.getIssuedTickets();
+    let updatedCount = 0;
+    allTickets.forEach((t) => {
+      if (t.bookingId === bookingId) {
+        t.verificationStatus = 'verified';
+        t.verifiedAt = now;
+        t.verifiedBy = adminUser.name;
+        updatedCount++;
+        setDoc(doc(db, 'issuedTickets', t.id), t).catch(() => {});
+      }
+    });
+
+    if (updatedCount > 0) {
+      localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(allTickets));
+    }
+
+    this.notify();
+    return { success: true, message: `Berhasil memverifikasi pembayaran dan menerbitkan ${updatedCount} tiket peserta.` };
   }
 
   /**
@@ -338,12 +610,40 @@ class StorageService {
   // --- Issued Tickets & Gate Validation (FR-CHK-01, FR-CHK-02, FR-CHK-03) ---
   public getIssuedTickets(eventId?: string): IssuedTicket[] {
     try {
+      const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
       const data = localStorage.getItem(STORAGE_KEYS.ISSUED_TICKETS);
-      const all: IssuedTicket[] = data ? JSON.parse(data) : INITIAL_ISSUED_TICKETS;
+      const all: IssuedTicket[] = data !== null ? JSON.parse(data) : (isCleared ? [] : INITIAL_ISSUED_TICKETS);
       return eventId ? all.filter((t) => t.eventId === eventId) : all;
     } catch {
-      return INITIAL_ISSUED_TICKETS;
+      return [];
     }
+  }
+
+  /**
+   * Delete an individual issued ticket from local & Firestore
+   */
+  public async deleteIssuedTicket(ticketId: string): Promise<{ success: boolean; message: string }> {
+    const currentTickets = this.getIssuedTickets();
+    const targetTicket = currentTickets.find((t) => t.id === ticketId);
+    const updatedTickets = currentTickets.filter((t) => t.id !== ticketId);
+    localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(updatedTickets));
+
+    // Also remove logs for this ticket
+    const currentLogs = this.getLogs();
+    const updatedLogs = currentLogs.filter((l) => l.issuedTicketId !== ticketId);
+    localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(updatedLogs));
+
+    try {
+      await deleteDoc(doc(db, 'issuedTickets', ticketId));
+    } catch (err) {
+      console.warn('Firestore ticket deletion warning:', err);
+    }
+
+    this.notify();
+    return {
+      success: true,
+      message: `E-Ticket ${targetTicket?.ticketNumber || ticketId} milik ${targetTicket?.attendeeName || 'peserta'} berhasil dihapus.`,
+    };
   }
 
   /**
@@ -434,6 +734,15 @@ class StorageService {
     allTickets[ticketIndex] = ticket;
     localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(allTickets));
 
+    // Sync check-in to Firestore
+    updateDoc(doc(db, 'issuedTickets', ticket.id), {
+      status: 'checked-in',
+      checkedInAt: checkInTime,
+      checkedInBy: staff.name,
+      gateName: staff.staffGate || 'Gate Utama',
+      checkInMethod: 'qr_scanner',
+    }).catch(() => {});
+
     const latencyMs = Math.round(performance.now() - startTime);
 
     this.recordLog({
@@ -506,6 +815,7 @@ class StorageService {
       (t) =>
         t.ticketNumber.toUpperCase().includes(cleanQuery) ||
         t.attendeeName.toUpperCase().includes(cleanQuery) ||
+        (t.attendeeNik && t.attendeeNik.toUpperCase().includes(cleanQuery)) ||
         t.attendeeEmail.toUpperCase().includes(cleanQuery)
     );
 
@@ -517,11 +827,12 @@ class StorageService {
   }
 
   /**
-   * Confirm Manual Check-In by Supervisor with KTP Last 4 Digits verification
+   * Confirm Manual Check-In by Supervisor with NIK (Nomor Induk Kependudukan) verification
    */
   public supervisorManualCheckIn(params: {
     ticketId: string;
-    enteredIdLast4: string;
+    enteredNik?: string;
+    enteredIdLast4?: string; // support backward compatibility
     supervisorNote: string;
     supervisor: User;
   }): { success: boolean; message: string; result: CheckInResult; ticket?: IssuedTicket } {
@@ -532,9 +843,17 @@ class StorageService {
     }
 
     const ticket = all[idx];
+    const cleanEntered = (params.enteredNik || params.enteredIdLast4 || '').trim().toUpperCase();
+    const storedNik = (ticket.attendeeNik || '').trim().toUpperCase();
+    const storedLast4 = (ticket.attendeeIdLast4 || '').trim().toUpperCase();
 
-    // Verify 4-digit ID
-    if (ticket.attendeeIdLast4 !== params.enteredIdLast4.trim()) {
+    // Verify NIK: matches full NIK, ends with entered digits, or matches last 4
+    const isNikMatch = 
+      cleanEntered === storedNik ||
+      storedNik.endsWith(cleanEntered) ||
+      cleanEntered === storedLast4;
+
+    if (!isNikMatch) {
       this.recordLog({
         issuedTicketId: ticket.id,
         ticketNumber: ticket.ticketNumber,
@@ -543,13 +862,13 @@ class StorageService {
         staffName: params.supervisor.name,
         method: 'manual_supervisor',
         result: 'invalid_token',
-        message: `Gagal verifikasi identitas: 4 digit KTP tidak cocok (Dimasukkan: ${params.enteredIdLast4})`,
+        message: `Gagal verifikasi identitas: NIK tidak cocok (Dimasukkan: ${cleanEntered})`,
         deviceInfo: 'Supervisor Helpdesk',
         gateName: params.supervisor.staffGate || 'Posko Helpdesk',
       });
       return {
         success: false,
-        message: `VERIFIKASI KTP GAGAL: 4 Digit terakhir KTP (${params.enteredIdLast4}) tidak sesuai dengan data pemesan asli.`,
+        message: `VERIFIKASI NIK GAGAL: Nomor NIK (${cleanEntered}) tidak sesuai dengan NIK terdaftar milik pengunjung.`,
         result: 'invalid_token',
       };
     }
@@ -574,6 +893,16 @@ class StorageService {
 
     all[idx] = ticket;
     localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(all));
+
+    // Sync manual check-in to Firestore
+    updateDoc(doc(db, 'issuedTickets', ticket.id), {
+      status: 'checked-in',
+      checkedInAt: checkInTime,
+      checkedInBy: `${params.supervisor.name} (Supervisor Helpdesk)`,
+      gateName: params.supervisor.staffGate || 'Posko Helpdesk',
+      checkInMethod: 'manual_supervisor',
+      notes: params.supervisorNote,
+    }).catch(() => {});
 
     this.recordLog({
       issuedTicketId: ticket.id,
@@ -622,10 +951,12 @@ class StorageService {
   // --- Audit Logs (NFR-AUD-01) ---
   public getLogs(): CheckInLog[] {
     try {
+      const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
       const data = localStorage.getItem(STORAGE_KEYS.LOGS);
-      return data ? JSON.parse(data) : INITIAL_LOGS;
+      if (data !== null) return JSON.parse(data);
+      return isCleared ? [] : INITIAL_LOGS;
     } catch {
-      return INITIAL_LOGS;
+      return [];
     }
   }
 
@@ -639,6 +970,10 @@ class StorageService {
     logs.unshift(newLog);
     // Keep last 150 logs in memory
     localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(logs.slice(0, 150)));
+
+    // Sync log to Firestore
+    setDoc(doc(db, 'checkInLogs', newLog.id), newLog).catch(() => {});
+
     this.notify();
   }
 
