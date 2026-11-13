@@ -33,8 +33,8 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
   
   // Selected ticket for manual verification
   const [selectedTicket, setSelectedTicket] = useState<IssuedTicket | null>(null);
-  const [inputNIK, setInputNIK] = useState<string>('');
-  const [supervisorNote, setSupervisorNote] = useState<string>('Layar HP pengunjung retak, identitas NIK asli diverifikasi.');
+  const [inputOrigin, setInputOrigin] = useState<string>('');
+  const [supervisorNote, setSupervisorNote] = useState<string>('Layar HP pengunjung retak, data Asal/Lembaga sesuai sistem.');
   const [verificationFeedback, setVerificationFeedback] = useState<{
     success: boolean;
     message: string;
@@ -70,17 +70,17 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
     if (!selectedTicket) return;
     setVerificationFeedback(null);
 
-    if (!inputNIK.trim() || inputNIK.trim().length < 4) {
+    if (!inputOrigin.trim() || inputOrigin.trim().length < 2) {
       setVerificationFeedback({
         success: false,
-        message: 'Masukkan NIK pengunjung (16 digit atau minimal 4 digit terakhir).',
+        message: 'Masukkan Asal / Lembaga pengunjung yang sesuai dengan data pendaftaran.',
       });
       return;
     }
 
     const res = storageService.supervisorManualCheckIn({
       ticketId: selectedTicket.id,
-      enteredNik: inputNIK.trim(),
+      enteredOrigin: inputOrigin.trim(),
       supervisorNote,
       supervisor: currentUser,
     });
@@ -112,10 +112,10 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
             <span>MODUL HELPDESK & JALUR DARURAT (SUPERVISOR OVERRIDE)</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-1">
-            Verifikasi & Validasi Tiket Manual (NIK)
+            Verifikasi &amp; Validasi Tiket Manual (Helpdesk)
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Jalur darurat apabila QR Code gagal terbaca (layar retak, baterai habis, atau kendala jaringan). Verifikasi data dengan NIK.
+            Jalur darurat apabila QR Code gagal terbaca (layar retak, baterai habis, atau kendala jaringan). Verifikasi data dengan Asal / Lembaga peserta.
           </p>
         </div>
 
@@ -215,7 +215,7 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
                     key={t.id}
                     onClick={() => {
                       setSelectedTicket(t);
-                      setInputNIK('');
+                      setInputOrigin('');
                       setVerificationFeedback(null);
                     }}
                     className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
@@ -252,8 +252,10 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
                     </div>
 
                     <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-                      <span className="font-mono text-slate-300">NIK: {t.attendeeNik || ('**' + t.attendeeIdLast4)}</span>
-                      <span className="text-indigo-400 font-medium">Verifikasi Tiket &rarr;</span>
+                      <span className="font-mono text-slate-300 truncate max-w-[65%]">
+                        Asal/Lembaga: {t.attendeeOrigin || t.attendeeNik || '-'}
+                      </span>
+                      <span className="text-indigo-400 font-medium shrink-0">Verifikasi Tiket &rarr;</span>
                     </div>
                   </div>
                 );
@@ -262,10 +264,10 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
           )}
         </div>
 
-        {/* Right Column: Physical NIK Verification & Approval Form (lg:col-span-6) */}
+        {/* Right Column: Verification & Approval Form (lg:col-span-6) */}
         <div className="lg:col-span-6 space-y-4">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">
-            Formulir Konfirmasi Supervisor & Verifikasi NIK Fisik
+            Formulir Konfirmasi Supervisor &amp; Verifikasi Asal / Lembaga
           </span>
 
           {selectedTicket ? (
@@ -289,9 +291,11 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
                     </span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span className="text-slate-400">NIK Terdaftar:</span>
-                  <span className="font-mono font-semibold text-white">{selectedTicket.attendeeNik || ('**' + selectedTicket.attendeeIdLast4)}</span>
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-400">Asal / Lembaga Terdaftar:</span>
+                  <span className="font-mono font-semibold text-white text-right">
+                    {selectedTicket.attendeeOrigin || selectedTicket.attendeeNik || '-'}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Tier / Kelas:</span>
@@ -311,23 +315,23 @@ export const SupervisorHelpdesk: React.FC<SupervisorHelpdeskProps> = ({
                 )}
               </div>
 
-              {/* Form Input: NIK */}
+              {/* Form Input: Asal / Lembaga */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-white block">
-                  Cocokkan NIK Pengunjung (KTP / Identitas Fisik)
+                  Cocokkan Asal / Lembaga Pengunjung
                 </label>
                 <div className="relative">
                   <input
                     type="text"
-                    maxLength={16}
-                    value={inputNIK}
-                    onChange={(e) => setInputNIK(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Contoh: 330214... (16 Digit NIK atau 4 digit terakhir)"
-                    className="w-full px-4 py-2.5 text-sm font-mono tracking-wider bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                    maxLength={100}
+                    value={inputOrigin}
+                    onChange={(e) => setInputOrigin(e.target.value)}
+                    placeholder="Contoh: Universitas Gadjah Mada / Umum"
+                    className="w-full px-4 py-2.5 text-sm bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
                 <span className="text-[11px] text-slate-400 block">
-                  Petugas supervisor mencocokkan NIK dari KTP/SIM fisik pengunjung dengan sistem sebelum konfirmasi.
+                  Petugas supervisor mengonfirmasi Asal / Lembaga peserta sesuai data pendaftaran sebelum check-in manual.
                 </span>
               </div>
 

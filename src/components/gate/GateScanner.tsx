@@ -202,7 +202,12 @@ export const GateScanner: React.FC<GateScannerProps> = ({
           if (code) {
             executeValidation(code.data);
           } else {
-            alert('Tidak ditemukan QR Code yang valid pada gambar ini.');
+            soundEffects.playErrorInvalid();
+            setScanResult({
+              result: 'invalid_token',
+              message: 'QR Code tidak ditemukan pada gambar yang diunggah. Pastikan gambar QR terlihat jelas.',
+              latencyMs: 0,
+            });
           }
         }
       };
@@ -489,8 +494,8 @@ export const GateScanner: React.FC<GateScannerProps> = ({
                     <span className="text-white font-bold">{scanResult.ticket.ticketNumber}</span>
                   </div>
                   <div className="flex justify-between items-center text-slate-400">
-                    <span>NIK Pengunjung:</span>
-                    <span className="text-slate-200 font-semibold">{scanResult.ticket.attendeeNik || ('**' + scanResult.ticket.attendeeIdLast4)}</span>
+                    <span>Asal / Lembaga:</span>
+                    <span className="text-slate-200 font-semibold">{scanResult.ticket.attendeeOrigin || scanResult.ticket.attendeeNik || '-'}</span>
                   </div>
                   {scanResult.ticket.seat_or_gate && (
                     <div className="flex justify-between items-center text-slate-400">

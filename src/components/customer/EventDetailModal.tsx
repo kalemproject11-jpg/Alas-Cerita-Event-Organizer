@@ -2,25 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Event, TicketType, User } from '../../types';
 import { 
   X, 
-  Calendar, 
-  MapPin, 
-  CheckCircle2, 
   AlertCircle, 
-  Users, 
   ArrowRight,
-  ShieldCheck,
-  IdCard,
-  Mail,
-  Phone,
-  UserCheck
+  Building2,
 } from 'lucide-react';
 
 interface AttendeeData {
   name: string;
   email: string;
   phone: string;
-  nik: string;
-  idLast4?: string;
+  origin: string;
 }
 
 interface EventDetailModalProps {
@@ -36,14 +27,13 @@ interface EventDetailModalProps {
     customerName: string;
     customerEmail: string;
     customerPhone: string;
-    attendees: Array<{ name: string; email: string; phone: string; nik: string; idLast4: string }>;
+    attendees: Array<{ name: string; email: string; phone: string; origin: string }>;
   }) => void;
 }
 
 export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   event,
   ticketTypes,
-  currentUser,
   initialTierId,
   onClose,
   onProceedToCheckout,
@@ -67,14 +57,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const selectedTier = eventTiers.find((t) => t.id === selectedTierId) || eventTiers[0];
   const packageCapacity = selectedTier ? getPackageCapacity(selectedTier.name) : 1;
 
-  // Buyer / Penanggung Jawab Info (kosong untuk diisi pembeli asli)
-  const [buyerName, setBuyerName] = useState<string>('');
-  const [buyerEmail, setBuyerEmail] = useState<string>('');
-  const [buyerPhone, setBuyerPhone] = useState<string>('');
-
   // Attendees list automatically sized to packageCapacity
   const [attendees, setAttendees] = useState<AttendeeData[]>([
-    { name: '', email: '', phone: '', nik: '' },
+    { name: '', email: '', phone: '', origin: '' },
   ]);
 
   const [formError, setFormError] = useState<string | null>(null);
@@ -90,9 +75,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         for (let i = updated.length; i < capacity; i++) {
           updated.push({
             name: '',
-            email: buyerEmail,
-            phone: buyerPhone,
-            nik: '',
+            email: '',
+            phone: '',
+            origin: '',
           });
         }
       } else if (capacity < updated.length) {
@@ -100,7 +85,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       }
       return updated;
     });
-  }, [selectedTierId, buyerEmail, buyerPhone]);
+  }, [selectedTierId]);
 
   const handleAttendeeChange = (idx: number, field: keyof AttendeeData, value: string) => {
     setAttendees((prev) => {
@@ -120,10 +105,6 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       setFormError(`Kuota paket ${selectedTier.name} sudah habis.`);
       return;
     }
-    if (!buyerName.trim() || !buyerEmail.trim() || !buyerPhone.trim()) {
-      setFormError('Lengkapi informasi penanggung jawab pemesan (Nama, Email, dan No. WhatsApp).');
-      return;
-    }
 
     // Validate each attendee according to package capacity
     for (let i = 0; i < attendees.length; i++) {
@@ -132,28 +113,37 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         setFormError(`Nama lengkap peserta #${i + 1} (${selectedTier.name}) wajib diisi.`);
         return;
       }
-      const cleanNik = att.nik.trim().replace(/\D/g, '');
-      if (!cleanNik || cleanNik.length < 10) {
-        setFormError(
-          `Masukkan NIK (Nomor Induk Kependudukan) yang valid (minimal 10-16 digit) untuk peserta #${i + 1} (${att.name || 'Peserta'}).`
-        );
+      if (!att.origin.trim() || att.origin.trim().length < 2) {
+        setFormError(`Asal / Lembaga untuk peserta #${i + 1} (${att.name || 'Peserta'}) wajib diisi.`);
         return;
       }
+      if (i === 0) {
+        if (!att.phone.trim()) {
+          setFormError('No. WhatsApp / HP Peserta #1 wajib diisi untuk konfirmasi pemesanan.');
+          return;
+        }
+        if (!att.email.trim() || !att.email.includes('@')) {
+          setFormError('Alamat Email Peserta #1 wajib diisi dengan benar untuk pengiriman E-Ticket.');
+          return;
+        }
+      }
     }
+
+    const primaryEmail = attendees[0].email.trim();
+    const primaryPhone = attendees[0].phone.trim();
 
     onProceedToCheckout({
       eventId: event.id,
       ticketTypeId: selectedTier.id,
-      quantity: packageCapacity,
-      customerName: buyerName.trim(),
-      customerEmail: buyerEmail.trim(),
-      customerPhone: buyerPhone.trim(),
+      quantity: 1,
+      customerName: attendees[0].name.trim(),
+      customerEmail: primaryEmail,
+      customerPhone: primaryPhone,
       attendees: attendees.map((att) => ({
         name: att.name.trim(),
-        email: att.email.trim() || buyerEmail.trim(),
-        phone: att.phone.trim() || buyerPhone.trim(),
-        nik: att.nik.trim(),
-        idLast4: att.nik.trim().slice(-4),
+        email: att.email.trim() || primaryEmail,
+        phone: att.phone.trim() || primaryPhone,
+        origin: att.origin.trim(),
       })),
     });
   };
@@ -192,7 +182,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           
           {/* STEP 1: PILIH PAKET PENGALAMAN (Fixed Capacity: Single / Couple / Circle) */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <label className="text-xs font-bold text-stone-200 uppercase tracking-wider font-mono flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-gradient-to-r from-pink-500 to-amber-400 text-stone-950 flex items-center justify-center text-[11px] font-black">1</span>
                 <span>Pilih Paket Tiket:</span>
@@ -259,61 +249,15 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             </div>
           </div>
 
-          {/* STEP 2: DATA PEMESAN / PENANGGUNG JAWAB */}
-          <div className="space-y-3 pt-2 border-t border-pink-500/20">
-            <label className="text-xs font-bold text-stone-200 uppercase tracking-wider font-mono flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-gradient-to-r from-pink-500 to-amber-400 text-stone-950 flex items-center justify-center text-[11px] font-black">2</span>
-              <span>Data Penanggung Jawab Pemesanan:</span>
-            </label>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="text-[11px] text-stone-300 block mb-1">Nama Pemesan:</label>
-                <input
-                  type="text"
-                  required
-                  value={buyerName}
-                  onChange={(e) => setBuyerName(e.target.value)}
-                  placeholder="Nama Lengkap"
-                  className="w-full px-3.5 py-2 text-xs bg-[#170a16] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400 focus:ring-1 focus:ring-pink-400"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] text-stone-300 block mb-1">Email Aktif (Kirim Tiket):</label>
-                <input
-                  type="email"
-                  required
-                  value={buyerEmail}
-                  onChange={(e) => setBuyerEmail(e.target.value)}
-                  placeholder="nama@email.com"
-                  className="w-full px-3.5 py-2 text-xs bg-[#170a16] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400 focus:ring-1 focus:ring-pink-400"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] text-stone-300 block mb-1">No. WhatsApp / HP:</label>
-                <input
-                  type="tel"
-                  required
-                  value={buyerPhone}
-                  onChange={(e) => setBuyerPhone(e.target.value)}
-                  placeholder="0812xxxxxxxx"
-                  className="w-full px-3.5 py-2 text-xs bg-[#170a16] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400 focus:ring-1 focus:ring-pink-400"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* STEP 3: BIODATA SESUAI JUMLAH PAKET DENGAN NIK (1/2/3 PESERTA) */}
+          {/* STEP 2: BIODATA SESUAI JUMLAH PAKET (1/2/3 PESERTA) */}
           <div className="space-y-4 pt-2 border-t border-pink-500/20">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <label className="text-xs font-bold text-stone-200 uppercase tracking-wider font-mono flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-gradient-to-r from-pink-500 to-amber-400 text-stone-950 flex items-center justify-center text-[11px] font-black">3</span>
-                <span>Biodata Peserta Hadir (Otomatis {packageCapacity} Orang untuk {selectedTier?.name}):</span>
+                <span className="w-5 h-5 rounded-full bg-gradient-to-r from-pink-500 to-amber-400 text-stone-950 flex items-center justify-center text-[11px] font-black">2</span>
+                <span>Biodata Peserta Hadir ({packageCapacity} Orang untuk {selectedTier?.name}):</span>
               </label>
               <span className="text-[11px] text-[#FACC15] font-mono font-bold">
-                Setiap tiket diterbitkan per-nama dengan NIK
+                Setiap tiket diterbitkan per-nama peserta
               </span>
             </div>
 
@@ -342,62 +286,67 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     {/* Nama Lengkap */}
                     <div>
                       <label className="text-stone-200 font-semibold block mb-1">
-                        Nama Lengkap (Sesuai KTP/Identitas): <span className="text-pink-400">*</span>
+                        Nama Lengkap: <span className="text-pink-400">*</span>
                       </label>
                       <input
                         type="text"
                         required
                         value={att.name}
                         onChange={(e) => handleAttendeeChange(idx, 'name', e.target.value)}
-                        placeholder={`Nama Peserta #${idx + 1}`}
+                        placeholder={`Nama Lengkap Peserta #${idx + 1}`}
                         className="w-full px-3 py-2 bg-[#170a16] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400 focus:ring-1 focus:ring-pink-400"
                       />
                     </div>
 
-                    {/* NIK (Nomor Induk Kependudukan) */}
+                    {/* Asal / Lembaga */}
                     <div>
                       <label className="text-stone-200 font-semibold block mb-1 flex items-center justify-between">
-                        <span>NIK (Nomor Induk Kependudukan): <span className="text-pink-400">*</span></span>
-                        <span className="text-[10px] font-mono text-[#FACC15] font-bold">16 Digit</span>
+                        <span>Asal / Lembaga: <span className="text-pink-400">*</span></span>
                       </label>
                       <div className="relative">
-                        <IdCard className="w-4 h-4 text-pink-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <Building2 className="w-4 h-4 text-pink-400 absolute left-3 top-1/2 -translate-y-1/2" />
                         <input
                           type="text"
                           required
-                          maxLength={16}
-                          value={att.nik}
-                          onChange={(e) => handleAttendeeChange(idx, 'nik', e.target.value.replace(/\D/g, ''))}
-                          placeholder="Contoh: 3304123456780001"
-                          className="w-full pl-9 pr-3 py-2 bg-[#170a16] border border-pink-500/30 rounded-xl text-white font-mono placeholder-stone-500 focus:outline-none focus:border-pink-400 focus:ring-1 focus:ring-pink-400"
+                          maxLength={100}
+                          value={att.origin}
+                          onChange={(e) => handleAttendeeChange(idx, 'origin', e.target.value)}
+                          placeholder="Contoh: UGM / Komunitas / Umum"
+                          className="w-full pl-9 pr-3 py-2 bg-[#170a16] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400 focus:ring-1 focus:ring-pink-400"
                         />
                       </div>
                       <span className="text-[10px] text-pink-300/70 mt-0.5 block">
-                        NIK digunakan untuk verifikasi identitas resmi saat penukaran gelang/gate Kalura.
+                        Isi asal instansi, kampus, sekolah, komunitas, atau Umum.
                       </span>
                     </div>
 
                     {/* WhatsApp */}
                     <div>
-                      <label className="text-stone-300 block mb-1">No. WhatsApp Peserta:</label>
+                      <label className="text-stone-200 font-semibold block mb-1">
+                        No. WhatsApp / HP {idx === 0 ? <span className="text-pink-400">*</span> : <span className="text-stone-400 font-normal">(Opsional)</span>}:
+                      </label>
                       <input
                         type="tel"
+                        required={idx === 0}
                         value={att.phone}
                         onChange={(e) => handleAttendeeChange(idx, 'phone', e.target.value)}
                         placeholder="0812xxxxxxxx"
-                        className="w-full px-3 py-2 bg-[#170a16] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400"
+                        className="w-full px-3 py-2 bg-[#170a16] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400 focus:ring-1 focus:ring-pink-400"
                       />
                     </div>
 
                     {/* Email */}
                     <div>
-                      <label className="text-stone-300 block mb-1">Email Peserta:</label>
+                      <label className="text-stone-200 font-semibold block mb-1">
+                        Email {idx === 0 ? <>(Kirim E-Ticket) <span className="text-pink-400">*</span></> : <span className="text-stone-400 font-normal">(Opsional)</span>}:
+                      </label>
                       <input
                         type="email"
+                        required={idx === 0}
                         value={att.email}
                         onChange={(e) => handleAttendeeChange(idx, 'email', e.target.value)}
                         placeholder="email@peserta.com"
-                        className="w-full px-3 py-2 bg-[#170a16] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400"
+                        className="w-full px-3 py-2 bg-[#170a16] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400 focus:ring-1 focus:ring-pink-400"
                       />
                     </div>
                   </div>

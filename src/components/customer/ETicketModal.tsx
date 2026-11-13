@@ -151,7 +151,9 @@ export const ETicketModal: React.FC<ETicketModalProps> = ({ ticket, event, onClo
               <div className="p-3.5 bg-[#231221] rounded-xl border border-pink-500/25 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-1">
                   <span className="text-[10px] uppercase font-semibold text-pink-300/70">Nama Pengunjung</span>
-                  <span className="text-[10px] font-mono text-amber-300 font-bold">NIK: {ticket.attendeeNik || ('**' + ticket.attendeeIdLast4)}</span>
+                  <span className="text-[10px] font-mono text-amber-300 font-bold">
+                    Asal/Lembaga: {ticket.attendeeOrigin || ticket.attendeeNik || '-'}
+                  </span>
                 </div>
                 <span className="text-sm font-bold text-white block">{ticket.attendeeName}</span>
                 <span className="text-xs text-stone-300 block break-all">{ticket.attendeeEmail} &middot; {ticket.attendeePhone}</span>
@@ -201,7 +203,7 @@ export const ETicketModal: React.FC<ETicketModalProps> = ({ ticket, event, onClo
               2. Tangkapan layar yang dibagikan atau dipindai ulang akan otomatis ditolak dan memicu sirene peringatan scan ganda pada terminal petugas.
             </p>
             <p>
-              3. Jika layar ponsel retak atau QR gagal terbaca, hubungi <strong>Posko Helpdesk Supervisor</strong> dengan menunjukkan ID Tiket Visual <strong>({ticket.ticketNumber})</strong> dan KTP/NIK fisik asli.
+              3. Jika layar ponsel retak atau QR gagal terbaca, hubungi <strong>Posko Helpdesk Supervisor</strong> dengan menunjukkan ID Tiket Visual <strong>({ticket.ticketNumber})</strong> dan konfirmasi data Asal/Lembaga terdaftar.
             </p>
           </div>
         </div>

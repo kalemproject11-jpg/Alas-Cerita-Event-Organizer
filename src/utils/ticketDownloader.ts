@@ -107,13 +107,13 @@ export async function downloadTicketAsPNG(ticket: IssuedTicket, event: Event): P
   ctx.font = 'bold 22px sans-serif';
   ctx.fillText(ticket.attendeeName, 52, attY + 80);
 
-  // NIK
+  // Asal / Lembaga
   ctx.fillStyle = '#f9a8d4';
   ctx.font = '11px sans-serif';
-  ctx.fillText('NIK (Nomor Induk Kependudukan):', 52, attY + 112);
+  ctx.fillText('Asal / Lembaga:', 52, attY + 112);
   ctx.fillStyle = '#FACC15';
-  ctx.font = 'bold 16px monospace';
-  ctx.fillText(ticket.attendeeNik || `**${ticket.attendeeIdLast4 || '0000'}`, 52, attY + 132);
+  ctx.font = 'bold 16px sans-serif';
+  ctx.fillText(ticket.attendeeOrigin || ticket.attendeeNik || '-', 52, attY + 132);
 
   // Phone & Email
   ctx.fillStyle = '#f9a8d4';
@@ -205,7 +205,7 @@ export async function downloadTicketAsPNG(ticket: IssuedTicket, event: Event): P
   ctx.fillStyle = '#fce7f3';
   ctx.font = '10px sans-serif';
   ctx.fillText('• Tiket terenkripsi kriptografi UUID v4 dan hanya sah untuk 1 (satu) kali pemindaian masuk.', 52, footerY + 46);
-  ctx.fillText('• Jika ada kendala layar retak / baterai habis, hubungi Posko Helpdesk Supervisor dengan KTP asli.', 52, footerY + 62);
+  ctx.fillText('• Jika ada kendala layar retak / baterai habis, hubungi Posko Helpdesk Supervisor sesuai Asal/Lembaga terdaftar.', 52, footerY + 62);
   ctx.fillText('• Diterbitkan resmi oleh Panitia Pelaksana Alas Cerita (Kalura Secret Garden).', 52, footerY + 78);
 
   // Trigger browser download

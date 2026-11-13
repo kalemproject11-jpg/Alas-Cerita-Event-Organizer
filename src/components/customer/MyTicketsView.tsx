@@ -111,9 +111,11 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({
                         <span className="text-pink-300/60">Kategori:</span>
                         <span className="text-[#FACC15] font-bold">{ticket.ticketTypeName}</span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-pink-300/60">NIK (Nomor Induk Kependudukan):</span>
-                        <span className="font-mono text-amber-300 font-bold">{ticket.attendeeNik || ('**' + ticket.attendeeIdLast4)}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-pink-300/60">Asal / Lembaga:</span>
+                        <span className="font-mono text-amber-300 font-bold text-right truncate">
+                          {ticket.attendeeOrigin || ticket.attendeeNik || '-'}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-pink-300/60">Email:</span>

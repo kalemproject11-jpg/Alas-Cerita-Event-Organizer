@@ -73,23 +73,91 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
     setTimeout(() => setCopiedText(null), 2500);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setErrorMessage(null);
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        setErrorMessage('Ukuran file maksimal 10MB.');
-        return;
-      }
+  const [isCompressingImage, setIsCompressingImage] = useState(false);
+
+  // Compress uploaded transfer proof so large mobile camera photos / screenshots always fit within Firestore 1MB limit
+  const compressProofImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Gagal membaca file gambar.'));
       reader.onload = () => {
-        setProofImage(reader.result as string);
+        const img = new Image();
+        img.onerror = () => reject(new Error('Format gambar tidak dapat diproses. Gunakan JPG atau PNG.'));
+        img.onload = () => {
+          const maxDim = 1200;
+          let targetW = img.width;
+          let targetH = img.height;
+          if (targetW > maxDim || targetH > maxDim) {
+            const ratio = Math.min(maxDim / targetW, maxDim / targetH);
+            targetW = Math.round(targetW * ratio);
+            targetH = Math.round(targetH * ratio);
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = targetW;
+          canvas.height = targetH;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(reader.result as string);
+            return;
+          }
+
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, targetW, targetH);
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+
+          // Step down JPEG quality until base64 stays safely below ~520KB (well under Firestore's 1MB doc limit)
+          const qualities = [0.78, 0.65, 0.52, 0.4, 0.3];
+          let resultDataUrl = canvas.toDataURL('image/jpeg', qualities[0]);
+          for (let i = 1; i < qualities.length && resultDataUrl.length > 520_000; i++) {
+            resultDataUrl = canvas.toDataURL('image/jpeg', qualities[i]);
+          }
+
+          // Fallback dimension reduction if ultra-detailed image still exceeds 520KB
+          if (resultDataUrl.length > 520_000 && Math.max(targetW, targetH) > 800) {
+            const smallRatio = 800 / Math.max(targetW, targetH);
+            const smallCanvas = document.createElement('canvas');
+            smallCanvas.width = Math.round(targetW * smallRatio);
+            smallCanvas.height = Math.round(targetH * smallRatio);
+            const smallCtx = smallCanvas.getContext('2d');
+            if (smallCtx) {
+              smallCtx.fillStyle = '#ffffff';
+              smallCtx.fillRect(0, 0, smallCanvas.width, smallCanvas.height);
+              smallCtx.drawImage(canvas, 0, 0, smallCanvas.width, smallCanvas.height);
+              resultDataUrl = smallCanvas.toDataURL('image/jpeg', 0.5);
+            }
+          }
+
+          resolve(resultDataUrl);
+        };
+        img.src = reader.result as string;
       };
       reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setErrorMessage(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      setErrorMessage('Ukuran file maksimal 15MB.');
+      return;
+    }
+
+    setIsCompressingImage(true);
+    try {
+      const compressed = await compressProofImage(file);
+      setProofImage(compressed);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Gagal memproses foto bukti transfer.');
+    } finally {
+      setIsCompressingImage(false);
     }
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     setErrorMessage(null);
 
     // Requirement: Bukti transfer wajib diunggah sebagai syarat verifikasi
@@ -99,14 +167,14 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
     }
 
     setIsProcessing(true);
-    setTimeout(() => {
-      const res = storageService.completePayment(
-        booking.id, 
-        selectedMethod, 
-        proofImage, 
+    try {
+      const res = await storageService.completePayment(
+        booking.id,
+        selectedMethod,
+        proofImage,
         senderAccountName.trim() || booking.customerName
       );
-      setIsProcessing(false);
+
       if (res.success) {
         setPaidSuccess(true);
         try {
@@ -119,9 +187,13 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
           // ignore
         }
       } else {
-        setErrorMessage(res.error || 'Gagal memproses verifikasi pembayaran.');
+        setErrorMessage(res.error || 'Gagal menyimpan data ke server pusat. Periksa koneksi internet Anda lalu coba kirim ulang.');
       }
-    }, 700);
+    } catch {
+      setErrorMessage('Terjadi gangguan jaringan saat mengirim data ke server. Silakan coba klik kirim kembali.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -202,7 +274,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                 <span className="text-white font-sans font-medium text-right line-clamp-1">{event.title}</span>
               </div>
               <div className="flex justify-between text-stone-300">
-                <span>Nama Penanggung Jawab:</span>
+                <span>Nama Pemesan:</span>
                 <span className="text-white font-bold">{booking.customerName}</span>
               </div>
               <div className="flex justify-between text-stone-300">
@@ -264,7 +336,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                   Rp{booking.totalAmount.toLocaleString('id-ID')}
                 </span>
                 <span className="text-[11px] text-stone-300 block mt-0.5">
-                  Pemesan: <strong className="text-white">{booking.customerName}</strong> &bull; {booking.quantity} Tiket
+                  Pemesan: <strong className="text-white">{booking.customerName}</strong> &bull; {booking.quantity} Paket
                 </span>
               </div>
 
@@ -620,14 +692,16 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
               <button
                 type="button"
                 onClick={handleConfirmPayment}
-                disabled={isProcessing}
-                className="w-full py-4 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:brightness-110 text-stone-950 font-black rounded-2xl transition-all shadow-lg shadow-pink-500/25 flex items-center justify-center gap-2 cursor-pointer text-sm"
+                disabled={isProcessing || isCompressingImage}
+                className="w-full py-4 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:brightness-110 disabled:opacity-60 text-stone-950 font-black rounded-2xl transition-all shadow-lg shadow-pink-500/25 flex items-center justify-center gap-2 cursor-pointer text-sm"
               >
-                {isProcessing ? (
-                  <span className="animate-pulse">Mengunggah Bukti &amp; Menerbitkan E-Ticket...</span>
+                {isCompressingImage ? (
+                  <span className="animate-pulse">Mengoptimalkan Foto Bukti Bayar...</span>
+                ) : isProcessing ? (
+                  <span className="animate-pulse">Mengirim Bukti &amp; Data Peserta ke Admin...</span>
                 ) : (
                   <>
-                    <span>Kirim Bukti Pembayaran &amp; Dapatkan E-Ticket</span>
+                    <span>Kirim Bukti Pembayaran &amp; Selesaikan Pendaftaran</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

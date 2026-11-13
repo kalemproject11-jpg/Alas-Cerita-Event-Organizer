@@ -260,7 +260,7 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
             }`}
           >
             <ShieldAlert className="w-4 h-4 shrink-0" />
-            <span className="truncate">Helpdesk NIK</span>
+            <span className="truncate">Helpdesk Gate</span>
           </button>
 
           <button

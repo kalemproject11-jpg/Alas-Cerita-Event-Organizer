@@ -1,7 +1,7 @@
 import { User, Event, TicketType, Booking, IssuedTicket, CheckInLog, CheckInResult, PaymentMethod } from '../types';
 import { INITIAL_USERS, INITIAL_EVENTS, INITIAL_TICKET_TYPES, INITIAL_BOOKINGS, INITIAL_ISSUED_TICKETS, INITIAL_LOGS, ALAS_CERITA_PERKS } from '../data/mockData';
-import { db } from '../firebase';
-import { collection, doc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot } from 'firebase/firestore';
+import { db, auth } from '../firebase';
+import { collection, doc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, runTransaction } from 'firebase/firestore';
 
 const STORAGE_KEYS = {
   USERS: 'eventpass_users_v3',
@@ -26,6 +26,10 @@ function generateRandomTicketNumber(): string {
   return `TCK-${code}`;
 }
 
+function generateUniqueSuffix(len = 5): string {
+  return Math.random().toString(36).substring(2, 2 + len);
+}
+
 function generateUUID(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -37,9 +41,62 @@ function generateUUID(): string {
   });
 }
 
+function sanitizeForFirestore<T extends Record<string, any>>(obj: T): T {
+  const cleaned: Record<string, any> = {};
+  Object.keys(obj).forEach((key) => {
+    const val = obj[key];
+    if (val !== undefined) {
+      cleaned[key] = val;
+    }
+  });
+  return cleaned as T;
+}
+
+function logFirestoreError(error: unknown, operationType: string, path: string) {
+  const info = {
+    error: error instanceof Error ? error.message : String(error),
+    operationType,
+    path,
+    authInfo: {
+      userId: auth.currentUser?.uid || null,
+    },
+  };
+  console.warn('Firestore Sync Notice:', JSON.stringify(info));
+}
+
+function safeSetLocalStorage(key: string, value: unknown) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (err) {
+    // Handle QuotaExceededError cleanly (e.g., many base64 proof images in bookings)
+    if (key === STORAGE_KEYS.BOOKINGS && Array.isArray(value)) {
+      try {
+        const compact = value.map((b: any) => {
+          if (!b || !b.paymentProofUrl) return b;
+          const { paymentProofUrl: _proof, ...rest } = b;
+          return rest;
+        });
+        localStorage.setItem(key, JSON.stringify(compact));
+      } catch {
+        // Memory cache still retains full records
+      }
+    } else {
+      console.warn(`LocalStorage cache notice for ${key}:`, err);
+    }
+  }
+}
+
 class StorageService {
   private listeners: Set<() => void> = new Set();
   private isFirestoreSynced = false;
+
+  // Canonical in-memory caches so large multi-phone datasets never hit localStorage 5MB limit
+  private bookingsCache: Booking[] | null = null;
+  private issuedTicketsCache: IssuedTicket[] | null = null;
+  private ticketTypesCache: TicketType[] | null = null;
+  private logsCache: CheckInLog[] | null = null;
+  private pendingAttendeesMap: Map<string, Array<{ name: string; email: string; phone: string; origin: string }>> = new Map();
 
   constructor() {
     this.initializeDefaults();
@@ -58,41 +115,52 @@ class StorageService {
         if (!snapshot.empty) {
           const list: TicketType[] = [];
           snapshot.forEach((d) => list.push(d.data() as TicketType));
-          localStorage.setItem(STORAGE_KEYS.TICKET_TYPES, JSON.stringify(list));
+          this.ticketTypesCache = list;
+          safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, list);
           this.notify();
         } else if (!isCleared) {
-          // Seed initial tiers to Firestore once
           INITIAL_TICKET_TYPES.forEach((tt) => {
-            setDoc(doc(db, 'ticketTypes', tt.id), tt).catch(() => {});
+            setDoc(doc(db, 'ticketTypes', tt.id), sanitizeForFirestore(tt)).catch((err) =>
+              logFirestoreError(err, 'write', `ticketTypes/${tt.id}`)
+            );
           });
         }
-      }, (err) => console.warn('Firestore ticketTypes sync notice:', err.message));
+      }, (err) => logFirestoreError(err, 'list', 'ticketTypes'));
 
-      // 2. Listen to Bookings (real-time reflection of orders)
+      // 2. Listen to Bookings (real-time reflection from all smartphones -> single Admin Dashboard)
       onSnapshot(collection(db, 'bookings'), (snapshot) => {
         const list: Booking[] = [];
         snapshot.forEach((d) => list.push(d.data() as Booking));
-        localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(list));
+        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        this.bookingsCache = list;
+        safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, list);
         this.notify();
-      }, (err) => console.warn('Firestore bookings sync notice:', err.message));
+      }, (err) => logFirestoreError(err, 'list', 'bookings'));
 
-      // 3. Listen to Issued Tickets (real-time check-in and multi-device ticket pool)
+      // 3. Listen to Issued Tickets (real-time attendee biodata & QR status across all devices)
       onSnapshot(collection(db, 'issuedTickets'), (snapshot) => {
         const list: IssuedTicket[] = [];
         snapshot.forEach((d) => list.push(d.data() as IssuedTicket));
-        localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(list));
+        list.sort((a, b) => {
+          const tsA = Number(a.id.split('_')[1]) || 0;
+          const tsB = Number(b.id.split('_')[1]) || 0;
+          return tsB - tsA;
+        });
+        this.issuedTicketsCache = list;
+        safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, list);
         this.notify();
-      }, (err) => console.warn('Firestore issuedTickets sync notice:', err.message));
+      }, (err) => logFirestoreError(err, 'list', 'issuedTickets'));
 
       // 4. Listen to Gate Check-In Logs
       onSnapshot(collection(db, 'checkInLogs'), (snapshot) => {
         const list: CheckInLog[] = [];
         snapshot.forEach((d) => list.push(d.data() as CheckInLog));
-        // Sort latest first
         list.sort((a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime());
-        localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(list.slice(0, 150)));
+        const sliced = list.slice(0, 150);
+        this.logsCache = sliced;
+        safeSetLocalStorage(STORAGE_KEYS.LOGS, sliced);
         this.notify();
-      }, (err) => console.warn('Firestore checkInLogs sync notice:', err.message));
+      }, (err) => logFirestoreError(err, 'list', 'checkInLogs'));
     } catch (e) {
       console.warn('Firestore sync setup failed, operating on local cache:', e);
     }
@@ -103,25 +171,25 @@ class StorageService {
     const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
 
     if (!localStorage.getItem(STORAGE_KEYS.EVENTS)) {
-      localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(INITIAL_EVENTS));
+      safeSetLocalStorage(STORAGE_KEYS.EVENTS, INITIAL_EVENTS);
     }
     if (!localStorage.getItem(STORAGE_KEYS.TICKET_TYPES)) {
-      localStorage.setItem(STORAGE_KEYS.TICKET_TYPES, JSON.stringify(INITIAL_TICKET_TYPES));
+      safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, INITIAL_TICKET_TYPES);
     }
     if (!localStorage.getItem(STORAGE_KEYS.BOOKINGS)) {
-      localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(isCleared ? [] : INITIAL_BOOKINGS));
+      safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, isCleared ? [] : INITIAL_BOOKINGS);
     }
     if (!localStorage.getItem(STORAGE_KEYS.ISSUED_TICKETS)) {
-      localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(isCleared ? [] : INITIAL_ISSUED_TICKETS));
+      safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, isCleared ? [] : INITIAL_ISSUED_TICKETS);
     }
     if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
+      safeSetLocalStorage(STORAGE_KEYS.USERS, INITIAL_USERS);
     }
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID)) {
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_cust');
     }
     if (!localStorage.getItem(STORAGE_KEYS.LOGS)) {
-      localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(isCleared ? [] : INITIAL_LOGS));
+      safeSetLocalStorage(STORAGE_KEYS.LOGS, isCleared ? [] : INITIAL_LOGS);
     }
   }
 
@@ -141,44 +209,37 @@ class StorageService {
       return { success: true, message: 'Database dikembalikan ke data awal.' };
     }
     localStorage.removeItem(STORAGE_KEYS.SIMULATION_CLEARED);
-    localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(INITIAL_EVENTS));
-    localStorage.setItem(STORAGE_KEYS.TICKET_TYPES, JSON.stringify(INITIAL_TICKET_TYPES));
-    localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(INITIAL_BOOKINGS));
-    localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(INITIAL_ISSUED_TICKETS));
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
-    localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(INITIAL_LOGS));
+    this.ticketTypesCache = [...INITIAL_TICKET_TYPES];
+    this.bookingsCache = [...INITIAL_BOOKINGS];
+    this.issuedTicketsCache = [...INITIAL_ISSUED_TICKETS];
+    this.logsCache = [...INITIAL_LOGS];
+
+    safeSetLocalStorage(STORAGE_KEYS.EVENTS, INITIAL_EVENTS);
+    safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, INITIAL_TICKET_TYPES);
+    safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, INITIAL_BOOKINGS);
+    safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, INITIAL_ISSUED_TICKETS);
+    safeSetLocalStorage(STORAGE_KEYS.USERS, INITIAL_USERS);
+    safeSetLocalStorage(STORAGE_KEYS.LOGS, INITIAL_LOGS);
 
     // Clean existing Firestore documents first, then re-seed initial sample data
     try {
       const bookingsSnap = await getDocs(collection(db, 'bookings'));
-      for (const d of bookingsSnap.docs) {
-        await deleteDoc(doc(db, 'bookings', d.id));
-      }
+      await Promise.all(bookingsSnap.docs.map((d) => deleteDoc(doc(db, 'bookings', d.id))));
 
       const ticketsSnap = await getDocs(collection(db, 'issuedTickets'));
-      for (const d of ticketsSnap.docs) {
-        await deleteDoc(doc(db, 'issuedTickets', d.id));
-      }
+      await Promise.all(ticketsSnap.docs.map((d) => deleteDoc(doc(db, 'issuedTickets', d.id))));
 
       const logsSnap = await getDocs(collection(db, 'checkInLogs'));
-      for (const d of logsSnap.docs) {
-        await deleteDoc(doc(db, 'checkInLogs', d.id));
-      }
+      await Promise.all(logsSnap.docs.map((d) => deleteDoc(doc(db, 'checkInLogs', d.id))));
 
-      for (const tt of INITIAL_TICKET_TYPES) {
-        await setDoc(doc(db, 'ticketTypes', tt.id), tt);
-      }
-      for (const b of INITIAL_BOOKINGS) {
-        await setDoc(doc(db, 'bookings', b.id), b);
-      }
-      for (const t of INITIAL_ISSUED_TICKETS) {
-        await setDoc(doc(db, 'issuedTickets', t.id), t);
-      }
-      for (const l of INITIAL_LOGS) {
-        await setDoc(doc(db, 'checkInLogs', l.id), l);
-      }
+      await Promise.all([
+        ...INITIAL_TICKET_TYPES.map((tt) => setDoc(doc(db, 'ticketTypes', tt.id), sanitizeForFirestore(tt))),
+        ...INITIAL_BOOKINGS.map((b) => setDoc(doc(db, 'bookings', b.id), sanitizeForFirestore(b))),
+        ...INITIAL_ISSUED_TICKETS.map((t) => setDoc(doc(db, 'issuedTickets', t.id), sanitizeForFirestore(t))),
+        ...INITIAL_LOGS.map((l) => setDoc(doc(db, 'checkInLogs', l.id), sanitizeForFirestore(l))),
+      ]);
     } catch (err) {
-      console.warn('Firestore reset warning:', err);
+      logFirestoreError(err, 'write', 'resetAllData');
     }
 
     this.notify();
@@ -202,10 +263,13 @@ class StorageService {
     // 1. Mark simulation as cleared permanently
     localStorage.setItem(STORAGE_KEYS.SIMULATION_CLEARED, 'true');
 
-    // 2. Clear bookings, issuedTickets, logs in localStorage
-    localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify([]));
-    localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify([]));
-    localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify([]));
+    // 2. Clear bookings, issuedTickets, logs in memory & localStorage
+    this.bookingsCache = [];
+    this.issuedTicketsCache = [];
+    this.logsCache = [];
+    safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, []);
+    safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, []);
+    safeSetLocalStorage(STORAGE_KEYS.LOGS, []);
 
     // 3. Reset ticket tiers to full pristine quotas (ready for 100% production sales)
     const pristineTiers: TicketType[] = [
@@ -249,30 +313,25 @@ class StorageService {
         perks: ALAS_CERITA_PERKS,
       },
     ];
-    localStorage.setItem(STORAGE_KEYS.TICKET_TYPES, JSON.stringify(pristineTiers));
+    this.ticketTypesCache = pristineTiers;
+    safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, pristineTiers);
 
     // 4. Delete Firestore simulation documents in cloud
     try {
-      for (const tier of pristineTiers) {
-        await setDoc(doc(db, 'ticketTypes', tier.id), tier);
-      }
+      await Promise.all(
+        pristineTiers.map((tier) => setDoc(doc(db, 'ticketTypes', tier.id), sanitizeForFirestore(tier)))
+      );
 
       const bookingsSnap = await getDocs(collection(db, 'bookings'));
-      for (const d of bookingsSnap.docs) {
-        await deleteDoc(doc(db, 'bookings', d.id));
-      }
+      await Promise.all(bookingsSnap.docs.map((d) => deleteDoc(doc(db, 'bookings', d.id))));
 
       const ticketsSnap = await getDocs(collection(db, 'issuedTickets'));
-      for (const d of ticketsSnap.docs) {
-        await deleteDoc(doc(db, 'issuedTickets', d.id));
-      }
+      await Promise.all(ticketsSnap.docs.map((d) => deleteDoc(doc(db, 'issuedTickets', d.id))));
 
       const logsSnap = await getDocs(collection(db, 'checkInLogs'));
-      for (const d of logsSnap.docs) {
-        await deleteDoc(doc(db, 'checkInLogs', d.id));
-      }
+      await Promise.all(logsSnap.docs.map((d) => deleteDoc(doc(db, 'checkInLogs', d.id))));
     } catch (e) {
-      console.warn('Firestore cloud cleanup notification:', e);
+      logFirestoreError(e, 'delete', 'clearAllSimulationData');
     }
 
     this.notify();
@@ -286,7 +345,12 @@ class StorageService {
   public getUsers(): User[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.USERS);
-      return data ? JSON.parse(data) : INITIAL_USERS;
+      const parsed: User[] = data ? JSON.parse(data) : INITIAL_USERS;
+      return parsed.map((u) =>
+        u.id === 'usr_admin' && u.name.toLowerCase().includes('budi')
+          ? { ...u, name: 'EO Alas Cerita' }
+          : u
+      );
     } catch {
       return INITIAL_USERS;
     }
@@ -339,8 +403,12 @@ class StorageService {
   // --- Ticket Types ---
   public getTicketTypes(eventId?: string): TicketType[] {
     try {
+      if (this.ticketTypesCache) {
+        return eventId ? this.ticketTypesCache.filter((tt) => tt.eventId === eventId) : this.ticketTypesCache;
+      }
       const data = localStorage.getItem(STORAGE_KEYS.TICKET_TYPES);
       const all: TicketType[] = data ? JSON.parse(data) : INITIAL_TICKET_TYPES;
+      this.ticketTypesCache = all;
       return eventId ? all.filter((tt) => tt.eventId === eventId) : all;
     } catch {
       return INITIAL_TICKET_TYPES;
@@ -348,23 +416,32 @@ class StorageService {
   }
 
   public saveTicketType(ticketType: TicketType) {
-    const all = this.getTicketTypes();
+    const all = [...this.getTicketTypes()];
     const idx = all.findIndex((t) => t.id === ticketType.id);
     if (idx >= 0) {
       all[idx] = ticketType;
     } else {
       all.push(ticketType);
     }
-    localStorage.setItem(STORAGE_KEYS.TICKET_TYPES, JSON.stringify(all));
+    this.ticketTypesCache = all;
+    safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, all);
+    setDoc(doc(db, 'ticketTypes', ticketType.id), sanitizeForFirestore(ticketType)).catch((err) =>
+      logFirestoreError(err, 'write', `ticketTypes/${ticketType.id}`)
+    );
     this.notify();
   }
 
   // --- Bookings & Concurrency Quota Hold (FR-BKG-02) ---
   public getBookings(): Booking[] {
     try {
+      if (this.bookingsCache) return this.bookingsCache;
       const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
       const data = localStorage.getItem(STORAGE_KEYS.BOOKINGS);
-      if (data !== null) return JSON.parse(data);
+      if (data !== null) {
+        const parsed = JSON.parse(data);
+        this.bookingsCache = parsed;
+        return parsed;
+      }
       return isCleared ? [] : INITIAL_BOOKINGS;
     } catch {
       return [];
@@ -378,28 +455,31 @@ class StorageService {
     const currentBookings = this.getBookings();
     const targetBooking = currentBookings.find((b) => b.id === bookingId);
     const updatedBookings = currentBookings.filter((b) => b.id !== bookingId);
-    localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(updatedBookings));
+    this.bookingsCache = updatedBookings;
+    safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, updatedBookings);
 
     // Also remove associated issued tickets
     const currentTickets = this.getIssuedTickets();
     const ticketsToDelete = currentTickets.filter((t) => t.bookingId === bookingId);
     const remainingTickets = currentTickets.filter((t) => t.bookingId !== bookingId);
-    localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(remainingTickets));
+    this.issuedTicketsCache = remainingTickets;
+    safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, remainingTickets);
 
     // Also remove checkInLogs for those tickets
     const currentLogs = this.getLogs();
     const ticketIdsToDelete = new Set(ticketsToDelete.map((t) => t.id));
     const remainingLogs = currentLogs.filter((l) => !l.issuedTicketId || !ticketIdsToDelete.has(l.issuedTicketId));
-    localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(remainingLogs));
+    this.logsCache = remainingLogs;
+    safeSetLocalStorage(STORAGE_KEYS.LOGS, remainingLogs);
 
     // Delete in Firestore
     try {
-      await deleteDoc(doc(db, 'bookings', bookingId));
-      for (const t of ticketsToDelete) {
-        await deleteDoc(doc(db, 'issuedTickets', t.id));
-      }
+      await Promise.all([
+        deleteDoc(doc(db, 'bookings', bookingId)),
+        ...ticketsToDelete.map((t) => deleteDoc(doc(db, 'issuedTickets', t.id))),
+      ]);
     } catch (err) {
-      console.warn('Firestore single booking deletion warning:', err);
+      logFirestoreError(err, 'delete', `bookings/${bookingId}`);
     }
 
     this.notify();
@@ -421,16 +501,15 @@ class StorageService {
     eventId: string;
     ticketTypeId: string;
     quantity: number;
-    attendees: Array<{ name: string; email: string; phone: string; idLast4: string }>;
+    attendees: Array<{ name: string; email: string; phone: string; origin: string }>;
   }): { success: boolean; booking?: Booking; error?: string } {
-    // 1. Check ticket type quota with lock simulation
-    const ticketTypes = this.getTicketTypes();
+    const ticketTypes = [...this.getTicketTypes()];
     const ttIndex = ticketTypes.findIndex((t) => t.id === params.ticketTypeId);
     if (ttIndex === -1) {
       return { success: false, error: 'Kategori tiket tidak ditemukan.' };
     }
 
-    const targetTT = ticketTypes[ttIndex];
+    const targetTT = { ...ticketTypes[ttIndex] };
     if (targetTT.availableQuota < params.quantity) {
       return {
         success: false,
@@ -438,20 +517,22 @@ class StorageService {
       };
     }
 
-    // 2. Pessimistic lock reduction: deduct available quota, add to heldQuota
+    // 2. Pessimistic local lock reduction: deduct available quota, add to heldQuota
     targetTT.availableQuota -= params.quantity;
     targetTT.heldQuota = (targetTT.heldQuota || 0) + params.quantity;
     ticketTypes[ttIndex] = targetTT;
-    localStorage.setItem(STORAGE_KEYS.TICKET_TYPES, JSON.stringify(ticketTypes));
+    this.ticketTypesCache = ticketTypes;
+    safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, ticketTypes);
 
-    // 3. Generate booking with 30 minute expiration
+    // 3. Generate booking with collision-proof ID and 30 minute expiration
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
     const invoiceNum = Math.floor(1000 + Math.random() * 9000);
     const invoiceCode = `INV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${invoiceNum}`;
+    const bookingId = `bkg_${Date.now()}_${generateUniqueSuffix(5)}`;
 
     const newBooking: Booking = {
-      id: `bkg_${Date.now()}`,
+      id: bookingId,
       userId: params.userId,
       customerName: params.customerName,
       customerEmail: params.customerEmail,
@@ -466,33 +547,37 @@ class StorageService {
       quantity: params.quantity,
     };
 
-    const bookings = this.getBookings();
-    bookings.unshift(newBooking);
-    localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings));
+    const bookings = [newBooking, ...this.getBookings()];
+    this.bookingsCache = bookings;
+    safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, bookings);
 
-    // Save temporary attendee draft in session/local for when payment completes
-    sessionStorage.setItem(`booking_attendees_${newBooking.id}`, JSON.stringify(params.attendees));
+    // Save temporary attendee draft both in-memory AND sessionStorage (safe for WhatsApp/Instagram mobile WebViews)
+    this.pendingAttendeesMap.set(newBooking.id, params.attendees);
+    try {
+      sessionStorage.setItem(`booking_attendees_${newBooking.id}`, JSON.stringify(params.attendees));
+    } catch {
+      // memory map already holds attendees
+    }
 
     this.notify();
     return { success: true, booking: newBooking };
   }
 
   /**
-   * Process Payment / Webhook callback (FR-TKT-01 & FR-TKT-02)
-   * Changes payment_status to 'paid', converts held quota to permanently sold,
-   * and generates issued_tickets with dual identity (qr_token UUID + ticket_number 8-char).
+   * Process Payment & persist Booking + Proof + All Attendee Tickets to Cloud Firestore
+   * Guarantees that submissions from ANY smartphone automatically aggregate into the single Admin Dashboard.
    */
-  public completePayment(
-    bookingId: string, 
+  public async completePayment(
+    bookingId: string,
     paymentMethod: PaymentMethod = 'qris',
     paymentProofUrl?: string,
     senderName?: string
-  ): { success: boolean; error?: string } {
-    const bookings = this.getBookings();
+  ): Promise<{ success: boolean; error?: string }> {
+    const bookings = [...this.getBookings()];
     const bIndex = bookings.findIndex((b) => b.id === bookingId);
     if (bIndex === -1) return { success: false, error: 'Transaksi booking tidak ditemukan.' };
 
-    const booking = bookings[bIndex];
+    const booking: Booking = { ...bookings[bIndex] };
     if (booking.paymentStatus === 'paid') return { success: true };
 
     const now = new Date().toISOString();
@@ -507,37 +592,44 @@ class StorageService {
       booking.senderName = senderName;
     }
     booking.paidAt = now;
-    bookings[bIndex] = booking;
-    localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings));
 
-    // Release heldQuota permanently
-    const ticketTypes = this.getTicketTypes();
-    const ttIndex = ticketTypes.findIndex((t) => t.id === booking.ticketTypeId);
-    if (ttIndex >= 0) {
-      ticketTypes[ttIndex].heldQuota = Math.max(0, (ticketTypes[ttIndex].heldQuota || 0) - booking.quantity);
-      localStorage.setItem(STORAGE_KEYS.TICKET_TYPES, JSON.stringify(ticketTypes));
+    // Resolve attendees from in-memory map first, then sessionStorage fallback
+    let attendeesList = this.pendingAttendeesMap.get(booking.id);
+    if (!attendeesList) {
+      try {
+        const storedAttendees = sessionStorage.getItem(`booking_attendees_${booking.id}`);
+        if (storedAttendees) attendeesList = JSON.parse(storedAttendees);
+      } catch {
+        // fallback below
+      }
     }
-
-    // Generate Issued Tickets
-    const storedAttendees = sessionStorage.getItem(`booking_attendees_${booking.id}`);
-    const attendeesList: Array<{ name: string; email: string; phone: string; nik?: string; idLast4?: string }> = storedAttendees
-      ? JSON.parse(storedAttendees)
-      : Array.from({ length: booking.quantity }).map((_, i) => ({
-          name: `${booking.customerName} #${i + 1}`,
+    if (!attendeesList || attendeesList.length === 0) {
+      attendeesList = [
+        {
+          name: booking.customerName,
           email: booking.customerEmail,
           phone: booking.customerPhone,
-          nik: '347101230495000' + (i + 1),
-          idLast4: '000' + (i + 1),
-        }));
+          origin: 'Umum',
+        },
+      ];
+    }
 
-    const ticketType = ticketTypes.find((t) => t.id === booking.ticketTypeId);
+    const ticketTypes = [...this.getTicketTypes()];
+    const ttIndex = ticketTypes.findIndex((t) => t.id === booking.ticketTypeId);
+    const ticketType = ttIndex >= 0 ? { ...ticketTypes[ttIndex] } : undefined;
+    if (ticketType) {
+      ticketType.heldQuota = Math.max(0, (ticketType.heldQuota || 0) - booking.quantity);
+      ticketTypes[ttIndex] = ticketType;
+    }
+
     const existingIssued = this.getIssuedTickets();
     const newIssued: IssuedTicket[] = [];
+    const baseTimestamp = Date.now();
 
     attendeesList.forEach((att, idx) => {
-      const nik = att.nik || att.idLast4 || `347101230495000${idx + 1}`;
+      const origin = (att.origin || 'Umum').trim();
       newIssued.push({
-        id: `tkt_${Date.now()}_${idx}`,
+        id: `tkt_${baseTimestamp}_${idx}_${generateUniqueSuffix(4)}`,
         bookingId: booking.id,
         eventId: booking.eventId,
         ticketTypeId: booking.ticketTypeId,
@@ -545,12 +637,11 @@ class StorageService {
         attendeeName: att.name,
         attendeeEmail: att.email,
         attendeePhone: att.phone,
-        attendeeNik: nik,
-        attendeeIdLast4: nik.slice(-4),
+        attendeeOrigin: origin,
         packageName: ticketType?.name || 'Single',
         packageMemberIndex: idx + 1,
-        packageTotalMembers: attendeesList.length,
-        packageGroupName: `Paket ${ticketType?.name || 'Tiket'} (${attendeesList.length} Orang)`,
+        packageTotalMembers: attendeesList!.length,
+        packageGroupName: `Paket ${ticketType?.name || 'Tiket'} (${attendeesList!.length} Orang)`,
         ticketNumber: generateRandomTicketNumber(),
         qrToken: generateUUID(),
         status: 'valid',
@@ -559,15 +650,55 @@ class StorageService {
       });
     });
 
-    localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify([...newIssued, ...existingIssued]));
+    // Write directly to Cloud Firestore and await confirmation BEFORE returning success to the buyer's phone
+    try {
+      const firestoreWrites: Promise<unknown>[] = [
+        setDoc(doc(db, 'bookings', booking.id), sanitizeForFirestore(booking)),
+        ...newIssued.map((t) => setDoc(doc(db, 'issuedTickets', t.id), sanitizeForFirestore(t))),
+      ];
 
-    // Sync to Firestore for real-time multi-device reflection
-    newIssued.forEach((t) => {
-      setDoc(doc(db, 'issuedTickets', t.id), t).catch(() => {});
-    });
-    setDoc(doc(db, 'bookings', booking.id), booking).catch(() => {});
-    if (ttIndex >= 0 && ticketTypes[ttIndex]) {
-      setDoc(doc(db, 'ticketTypes', ticketTypes[ttIndex].id), ticketTypes[ttIndex]).catch(() => {});
+      if (ticketType) {
+        const ttRef = doc(db, 'ticketTypes', ticketType.id);
+        firestoreWrites.push(
+          runTransaction(db, async (tx) => {
+            const snap = await tx.get(ttRef);
+            if (!snap.exists()) {
+              tx.set(ttRef, sanitizeForFirestore(ticketType));
+              return;
+            }
+            const currentData = snap.data() as TicketType;
+            const updatedAvailable = Math.max(0, (currentData.availableQuota ?? ticketType.quota) - booking.quantity);
+            tx.update(ttRef, { availableQuota: updatedAvailable });
+          })
+        );
+      }
+
+      await Promise.all(firestoreWrites);
+    } catch (err) {
+      logFirestoreError(err, 'write', `completePayment/${booking.id}`);
+      return {
+        success: false,
+        error: 'Gagal mengirim data & bukti pembayaran ke server pusat Admin. Pastikan koneksi internet stabil dan coba kirim ulang.',
+      };
+    }
+
+    // Update local state caches & cleanup temp map after confirmed cloud write
+    bookings[bIndex] = booking;
+    this.bookingsCache = bookings;
+    safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, bookings);
+
+    const updatedIssued = [...newIssued, ...existingIssued];
+    this.issuedTicketsCache = updatedIssued;
+    safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, updatedIssued);
+
+    this.ticketTypesCache = ticketTypes;
+    safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, ticketTypes);
+
+    this.pendingAttendeesMap.delete(booking.id);
+    try {
+      sessionStorage.removeItem(`booking_attendees_${booking.id}`);
+    } catch {
+      // ignore
     }
 
     this.notify();
@@ -578,31 +709,44 @@ class StorageService {
    * Admin approves and verifies booking payment proof, activating official E-Tickets
    */
   public verifyBookingAndTickets(bookingId: string, adminUser: User): { success: boolean; message: string } {
-    const bookings = this.getBookings();
+    const bookings = [...this.getBookings()];
     const bIndex = bookings.findIndex((b) => b.id === bookingId);
     const now = new Date().toISOString();
     if (bIndex >= 0) {
-      bookings[bIndex].verificationStatus = 'verified';
-      bookings[bIndex].verifiedAt = now;
-      bookings[bIndex].verifiedBy = adminUser.name;
-      localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings));
-      setDoc(doc(db, 'bookings', bookingId), bookings[bIndex]).catch(() => {});
+      bookings[bIndex] = {
+        ...bookings[bIndex],
+        verificationStatus: 'verified',
+        verifiedAt: now,
+        verifiedBy: adminUser.name,
+      };
+      this.bookingsCache = bookings;
+      safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, bookings);
+      setDoc(doc(db, 'bookings', bookingId), sanitizeForFirestore(bookings[bIndex])).catch((err) =>
+        logFirestoreError(err, 'update', `bookings/${bookingId}`)
+      );
     }
 
-    const allTickets = this.getIssuedTickets();
+    const allTickets = [...this.getIssuedTickets()];
     let updatedCount = 0;
-    allTickets.forEach((t) => {
+    allTickets.forEach((t, i) => {
       if (t.bookingId === bookingId) {
-        t.verificationStatus = 'verified';
-        t.verifiedAt = now;
-        t.verifiedBy = adminUser.name;
+        const updatedTicket: IssuedTicket = {
+          ...t,
+          verificationStatus: 'verified',
+          verifiedAt: now,
+          verifiedBy: adminUser.name,
+        };
+        allTickets[i] = updatedTicket;
         updatedCount++;
-        setDoc(doc(db, 'issuedTickets', t.id), t).catch(() => {});
+        setDoc(doc(db, 'issuedTickets', t.id), sanitizeForFirestore(updatedTicket)).catch((err) =>
+          logFirestoreError(err, 'update', `issuedTickets/${t.id}`)
+        );
       }
     });
 
     if (updatedCount > 0) {
-      localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(allTickets));
+      this.issuedTicketsCache = allTickets;
+      safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, allTickets);
     }
 
     this.notify();
@@ -613,28 +757,33 @@ class StorageService {
    * Cancel expired bookings and restore quota (FR-BKG-04 / Laravel Scheduler simulation)
    */
   public cancelExpiredBookings() {
-    const bookings = this.getBookings();
+    const bookings = [...this.getBookings()];
     const now = new Date().getTime();
     let updated = false;
-    const ticketTypes = this.getTicketTypes();
+    const ticketTypes = [...this.getTicketTypes()];
 
-    bookings.forEach((b) => {
+    bookings.forEach((b, idx) => {
       if (b.paymentStatus === 'pending' && new Date(b.expiresAt).getTime() < now) {
-        b.paymentStatus = 'expired';
+        bookings[idx] = { ...b, paymentStatus: 'expired' };
         updated = true;
 
         // Restore available quota
-        const tt = ticketTypes.find((t) => t.id === b.ticketTypeId);
-        if (tt) {
-          tt.availableQuota += b.quantity;
-          tt.heldQuota = Math.max(0, (tt.heldQuota || 0) - b.quantity);
+        const ttIdx = ticketTypes.findIndex((t) => t.id === b.ticketTypeId);
+        if (ttIdx >= 0) {
+          ticketTypes[ttIdx] = {
+            ...ticketTypes[ttIdx],
+            availableQuota: ticketTypes[ttIdx].availableQuota + b.quantity,
+            heldQuota: Math.max(0, (ticketTypes[ttIdx].heldQuota || 0) - b.quantity),
+          };
         }
       }
     });
 
     if (updated) {
-      localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings));
-      localStorage.setItem(STORAGE_KEYS.TICKET_TYPES, JSON.stringify(ticketTypes));
+      this.bookingsCache = bookings;
+      this.ticketTypesCache = ticketTypes;
+      safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, bookings);
+      safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, ticketTypes);
       this.notify();
     }
   }
@@ -642,9 +791,13 @@ class StorageService {
   // --- Issued Tickets & Gate Validation (FR-CHK-01, FR-CHK-02, FR-CHK-03) ---
   public getIssuedTickets(eventId?: string): IssuedTicket[] {
     try {
+      if (this.issuedTicketsCache) {
+        return eventId ? this.issuedTicketsCache.filter((t) => t.eventId === eventId) : this.issuedTicketsCache;
+      }
       const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
       const data = localStorage.getItem(STORAGE_KEYS.ISSUED_TICKETS);
       const all: IssuedTicket[] = data !== null ? JSON.parse(data) : (isCleared ? [] : INITIAL_ISSUED_TICKETS);
+      this.issuedTicketsCache = all;
       return eventId ? all.filter((t) => t.eventId === eventId) : all;
     } catch {
       return [];
@@ -658,17 +811,19 @@ class StorageService {
     const currentTickets = this.getIssuedTickets();
     const targetTicket = currentTickets.find((t) => t.id === ticketId);
     const updatedTickets = currentTickets.filter((t) => t.id !== ticketId);
-    localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(updatedTickets));
+    this.issuedTicketsCache = updatedTickets;
+    safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, updatedTickets);
 
     // Also remove logs for this ticket
     const currentLogs = this.getLogs();
     const updatedLogs = currentLogs.filter((l) => l.issuedTicketId !== ticketId);
-    localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(updatedLogs));
+    this.logsCache = updatedLogs;
+    safeSetLocalStorage(STORAGE_KEYS.LOGS, updatedLogs);
 
     try {
       await deleteDoc(doc(db, 'issuedTickets', ticketId));
     } catch (err) {
-      console.warn('Firestore ticket deletion warning:', err);
+      logFirestoreError(err, 'delete', `issuedTickets/${ticketId}`);
     }
 
     this.notify();
@@ -757,14 +912,19 @@ class StorageService {
 
     // Success check-in! Lock immediately
     const checkInTime = new Date().toISOString();
-    ticket.status = 'checked-in';
-    ticket.checkedInAt = checkInTime;
-    ticket.checkedInBy = staff.name;
-    ticket.gateName = staff.staffGate || 'Gate Utama';
-    ticket.checkInMethod = 'qr_scanner';
+    const allTicketsCopy = [...allTickets];
+    const updatedTicket: IssuedTicket = {
+      ...ticket,
+      status: 'checked-in',
+      checkedInAt: checkInTime,
+      checkedInBy: staff.name,
+      gateName: staff.staffGate || 'Gate Utama',
+      checkInMethod: 'qr_scanner',
+    };
 
-    allTickets[ticketIndex] = ticket;
-    localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(allTickets));
+    allTicketsCopy[ticketIndex] = updatedTicket;
+    this.issuedTicketsCache = allTicketsCopy;
+    safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, allTicketsCopy);
 
     // Sync check-in to Firestore
     updateDoc(doc(db, 'issuedTickets', ticket.id), {
@@ -773,7 +933,7 @@ class StorageService {
       checkedInBy: staff.name,
       gateName: staff.staffGate || 'Gate Utama',
       checkInMethod: 'qr_scanner',
-    }).catch(() => {});
+    }).catch((err) => logFirestoreError(err, 'update', `issuedTickets/${ticket.id}`));
 
     const latencyMs = Math.round(performance.now() - startTime);
 
@@ -847,6 +1007,7 @@ class StorageService {
       (t) =>
         t.ticketNumber.toUpperCase().includes(cleanQuery) ||
         t.attendeeName.toUpperCase().includes(cleanQuery) ||
+        (t.attendeeOrigin && t.attendeeOrigin.toUpperCase().includes(cleanQuery)) ||
         (t.attendeeNik && t.attendeeNik.toUpperCase().includes(cleanQuery)) ||
         t.attendeeEmail.toUpperCase().includes(cleanQuery)
     );
@@ -859,12 +1020,13 @@ class StorageService {
   }
 
   /**
-   * Confirm Manual Check-In by Supervisor with NIK (Nomor Induk Kependudukan) verification
+   * Confirm Manual Check-In by Supervisor with Asal/Lembaga verification
    */
   public supervisorManualCheckIn(params: {
     ticketId: string;
+    enteredOrigin?: string;
     enteredNik?: string;
-    enteredIdLast4?: string; // support backward compatibility
+    enteredIdLast4?: string;
     supervisorNote: string;
     supervisor: User;
   }): { success: boolean; message: string; result: CheckInResult; ticket?: IssuedTicket } {
@@ -875,17 +1037,18 @@ class StorageService {
     }
 
     const ticket = all[idx];
-    const cleanEntered = (params.enteredNik || params.enteredIdLast4 || '').trim().toUpperCase();
+    const cleanEntered = (params.enteredOrigin || params.enteredNik || params.enteredIdLast4 || '').trim().toUpperCase();
+    const storedOrigin = (ticket.attendeeOrigin || '').trim().toUpperCase();
     const storedNik = (ticket.attendeeNik || '').trim().toUpperCase();
     const storedLast4 = (ticket.attendeeIdLast4 || '').trim().toUpperCase();
 
-    // Verify NIK: matches full NIK, ends with entered digits, or matches last 4
-    const isNikMatch = 
-      cleanEntered === storedNik ||
-      storedNik.endsWith(cleanEntered) ||
-      cleanEntered === storedLast4;
+    const isIdentityMatch =
+      cleanEntered.length >= 2 &&
+      ((storedOrigin && (storedOrigin === cleanEntered || storedOrigin.includes(cleanEntered))) ||
+        (storedNik && (cleanEntered === storedNik || storedNik.endsWith(cleanEntered))) ||
+        (storedLast4 && cleanEntered === storedLast4));
 
-    if (!isNikMatch) {
+    if (!isIdentityMatch) {
       this.recordLog({
         issuedTicketId: ticket.id,
         ticketNumber: ticket.ticketNumber,
@@ -894,13 +1057,13 @@ class StorageService {
         staffName: params.supervisor.name,
         method: 'manual_supervisor',
         result: 'invalid_token',
-        message: `Gagal verifikasi identitas: NIK tidak cocok (Dimasukkan: ${cleanEntered})`,
+        message: `Gagal verifikasi identitas: Asal/Lembaga tidak cocok (Dimasukkan: ${cleanEntered})`,
         deviceInfo: 'Supervisor Helpdesk',
         gateName: params.supervisor.staffGate || 'Posko Helpdesk',
       });
       return {
         success: false,
-        message: `VERIFIKASI NIK GAGAL: Nomor NIK (${cleanEntered}) tidak sesuai dengan NIK terdaftar milik pengunjung.`,
+        message: `VERIFIKASI GAGAL: Asal/Lembaga (${cleanEntered}) tidak sesuai dengan data terdaftar milik pengunjung.`,
         result: 'invalid_token',
       };
     }
@@ -916,15 +1079,20 @@ class StorageService {
 
     // Success manual check-in
     const checkInTime = new Date().toISOString();
-    ticket.status = 'checked-in';
-    ticket.checkedInAt = checkInTime;
-    ticket.checkedInBy = `${params.supervisor.name} (Supervisor Helpdesk)`;
-    ticket.gateName = params.supervisor.staffGate || 'Posko Helpdesk';
-    ticket.checkInMethod = 'manual_supervisor';
-    ticket.notes = params.supervisorNote;
+    const allCopy = [...all];
+    const updatedTicket: IssuedTicket = {
+      ...ticket,
+      status: 'checked-in',
+      checkedInAt: checkInTime,
+      checkedInBy: `${params.supervisor.name} (Supervisor Helpdesk)`,
+      gateName: params.supervisor.staffGate || 'Posko Helpdesk',
+      checkInMethod: 'manual_supervisor',
+      notes: params.supervisorNote,
+    };
 
-    all[idx] = ticket;
-    localStorage.setItem(STORAGE_KEYS.ISSUED_TICKETS, JSON.stringify(all));
+    allCopy[idx] = updatedTicket;
+    this.issuedTicketsCache = allCopy;
+    safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, allCopy);
 
     // Sync manual check-in to Firestore
     updateDoc(doc(db, 'issuedTickets', ticket.id), {
@@ -934,7 +1102,7 @@ class StorageService {
       gateName: params.supervisor.staffGate || 'Posko Helpdesk',
       checkInMethod: 'manual_supervisor',
       notes: params.supervisorNote,
-    }).catch(() => {});
+    }).catch((err) => logFirestoreError(err, 'update', `issuedTickets/${ticket.id}`));
 
     this.recordLog({
       issuedTicketId: ticket.id,
@@ -983,9 +1151,14 @@ class StorageService {
   // --- Audit Logs (NFR-AUD-01) ---
   public getLogs(): CheckInLog[] {
     try {
+      if (this.logsCache) return this.logsCache;
       const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
       const data = localStorage.getItem(STORAGE_KEYS.LOGS);
-      if (data !== null) return JSON.parse(data);
+      if (data !== null) {
+        const parsed = JSON.parse(data);
+        this.logsCache = parsed;
+        return parsed;
+      }
       return isCleared ? [] : INITIAL_LOGS;
     } catch {
       return [];
@@ -993,18 +1166,21 @@ class StorageService {
   }
 
   private recordLog(log: Omit<CheckInLog, 'id' | 'scannedAt'>) {
-    const logs = this.getLogs();
+    const logs = [...this.getLogs()];
     const newLog: CheckInLog = {
-      id: `log_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      id: `log_${Date.now()}_${generateUniqueSuffix(4)}`,
       scannedAt: new Date().toISOString(),
       ...log,
     };
     logs.unshift(newLog);
-    // Keep last 150 logs in memory
-    localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(logs.slice(0, 150)));
+    const sliced = logs.slice(0, 150);
+    this.logsCache = sliced;
+    safeSetLocalStorage(STORAGE_KEYS.LOGS, sliced);
 
     // Sync log to Firestore
-    setDoc(doc(db, 'checkInLogs', newLog.id), newLog).catch(() => {});
+    setDoc(doc(db, 'checkInLogs', newLog.id), sanitizeForFirestore(newLog)).catch((err) =>
+      logFirestoreError(err, 'write', `checkInLogs/${newLog.id}`)
+    );
 
     this.notify();
   }

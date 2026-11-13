@@ -68,7 +68,7 @@ export default function App() {
     customerName: string;
     customerEmail: string;
     customerPhone: string;
-    attendees: Array<{ name: string; email: string; phone: string; nik: string; idLast4: string }>;
+    attendees: Array<{ name: string; email: string; phone: string; origin: string }>;
   }) => {
     setAppError(null);
     const res = storageService.createBooking({

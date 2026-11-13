@@ -87,6 +87,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
     const relatedBooking = bookings.find((b) => b.id === t.bookingId);
     return (
       t.attendeeName.toLowerCase().includes(q) ||
+      (t.attendeeOrigin && t.attendeeOrigin.toLowerCase().includes(q)) ||
       (t.attendeeNik && t.attendeeNik.toLowerCase().includes(q)) ||
       (t.attendeePhone && t.attendeePhone.toLowerCase().includes(q)) ||
       (t.attendeeEmail && t.attendeeEmail.toLowerCase().includes(q)) ||
@@ -185,7 +186,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
             Verifikasi Pembayaran &amp; Biodata Peserta
           </h2>
           <p className="text-xs text-stone-300 mt-0.5">
-            Rekap transaksi, bukti transfer, biodata lengkap peserta (Nama, NIK, HP, Email), dan unduh E-Ticket digital.
+            Rekap transaksi, bukti transfer, biodata lengkap peserta (Nama, Asal/Lembaga, HP, Email), dan unduh E-Ticket digital.
           </p>
         </div>
 
@@ -254,7 +255,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={viewMode === 'transactions' ? 'Cari Invoice, Nama Pemesan...' : 'Cari Nama Peserta, NIK, No. HP...'}
+            placeholder={viewMode === 'transactions' ? 'Cari Invoice, Nama Pemesan...' : 'Cari Nama Peserta, Asal/Lembaga, No. HP...'}
             className="w-full pl-9 pr-3 py-2.5 text-xs bg-[#170a16] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400 focus:ring-1 focus:ring-pink-400"
           />
         </div>
@@ -354,10 +355,10 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                         </span>
                       </div>
 
-                      {/* Penanggung Jawab / Buyer details */}
+                      {/* Buyer details */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
                         <div>
-                          <span className="text-[10px] text-pink-300/60 block font-mono">Penanggung Jawab Pemesan:</span>
+                          <span className="text-[10px] text-pink-300/60 block font-mono">Data Pemesan:</span>
                           <span className="font-bold text-white truncate block">{b.customerName}</span>
                           <span className="text-[11px] text-stone-300 font-mono">{b.customerPhone} &bull; {b.customerEmail}</span>
                         </div>
@@ -409,7 +410,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                                   </div>
 
                                   <div className="text-[10px] font-mono text-stone-300 space-x-2">
-                                    <span>NIK: <strong className="text-amber-300">{t.attendeeNik || ('**' + t.attendeeIdLast4)}</strong></span>
+                                    <span>Asal/Lembaga: <strong className="text-amber-300">{t.attendeeOrigin || t.attendeeNik || '-'}</strong></span>
                                     <span>&bull;</span>
                                     <span>HP: {t.attendeePhone || '-'}</span>
                                   </div>
@@ -590,8 +591,8 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
 
                     <div className="grid grid-cols-1 gap-1.5 p-3 bg-[#150914] rounded-xl border border-pink-500/15 text-[11px] font-mono">
                       <div className="flex justify-between gap-2">
-                        <span className="text-pink-300/60">NIK:</span>
-                        <span className="text-amber-300 font-bold">{t.attendeeNik || ('**' + t.attendeeIdLast4)}</span>
+                        <span className="text-pink-300/60">Asal/Lembaga:</span>
+                        <span className="text-amber-300 font-bold text-right truncate">{t.attendeeOrigin || t.attendeeNik || '-'}</span>
                       </div>
                       <div className="flex justify-between gap-2">
                         <span className="text-pink-300/60">No. HP:</span>
@@ -653,10 +654,10 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                     <th className="px-4 py-3">No</th>
                     <th className="px-4 py-3">ID Tiket</th>
                     <th className="px-4 py-3">Nama Lengkap Peserta</th>
-                    <th className="px-4 py-3">NIK (16 Digit)</th>
+                    <th className="px-4 py-3">Asal / Lembaga</th>
                     <th className="px-4 py-3">Kontak (HP &amp; Email)</th>
                     <th className="px-4 py-3">Paket / Bundle</th>
-                    <th className="px-4 py-3">Penanggung Jawab / Invoice</th>
+                    <th className="px-4 py-3">Pemesan / Invoice</th>
                     <th className="px-4 py-3">Status Verifikasi</th>
                     <th className="px-4 py-3 text-right">Aksi Unduh E-Ticket</th>
                   </tr>
@@ -685,8 +686,8 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                           <td className="px-4 py-3.5 font-bold text-white text-xs whitespace-nowrap">
                             {t.attendeeName}
                           </td>
-                          <td className="px-4 py-3.5 font-mono text-amber-300 text-xs whitespace-nowrap tabular-nums">
-                            {t.attendeeNik || ('**' + t.attendeeIdLast4)}
+                          <td className="px-4 py-3.5 text-amber-300 text-xs font-medium max-w-[200px] truncate">
+                            {t.attendeeOrigin || t.attendeeNik || '-'}
                           </td>
                           <td className="px-4 py-3.5 text-stone-200 text-xs whitespace-nowrap space-y-0.5 font-mono">
                             <div>{t.attendeePhone || '-'}</div>

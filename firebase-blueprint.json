@@ -64,6 +64,7 @@
         "attendeeName": { "type": "string" },
         "attendeeEmail": { "type": "string" },
         "attendeePhone": { "type": "string" },
+        "attendeeOrigin": { "type": "string" },
         "attendeeIdLast4": { "type": "string" },
         "ticketNumber": { "type": "string" },
         "qrToken": { "type": "string" },

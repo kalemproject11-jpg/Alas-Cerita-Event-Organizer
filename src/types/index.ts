@@ -83,8 +83,9 @@ export interface IssuedTicket {
   attendeeName: string;
   attendeeEmail: string;
   attendeePhone: string;
-  attendeeNik: string; // NIK (Nomor Induk Kependudukan)
-  attendeeIdLast4?: string; // fallback / last digits
+  attendeeOrigin?: string; // Asal / Lembaga peserta
+  attendeeNik?: string; // legacy fallback
+  attendeeIdLast4?: string; // legacy fallback
   packageName?: string; // 'Single' | 'Couple' | 'Circle'
   packageMemberIndex?: number; // e.g. 1, 2, 3
   packageTotalMembers?: number; // e.g. 1, 2, 3

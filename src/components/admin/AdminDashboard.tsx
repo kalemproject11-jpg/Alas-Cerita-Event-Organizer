@@ -78,7 +78,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       city: newEventCity,
       startTime: new Date(newEventDate).toISOString(),
       endTime: new Date(new Date(newEventDate).getTime() + 4 * 3600 * 1000).toISOString(),
-      posterUrl: '/src/assets/images/event_neon_music_festival_1794504186300.jpg',
+      posterUrl: '/assets/aistudio/alas-cerita-poster_fb646400.jpeg',
       status: 'published',
       category: newEventCategory,
       organizer: 'Soundwave Official EO',
