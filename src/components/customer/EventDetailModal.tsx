@@ -67,14 +67,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const selectedTier = eventTiers.find((t) => t.id === selectedTierId) || eventTiers[0];
   const packageCapacity = selectedTier ? getPackageCapacity(selectedTier.name) : 1;
 
-  // Buyer / Penanggung Jawab Info
-  const [buyerName, setBuyerName] = useState<string>(currentUser.name);
-  const [buyerEmail, setBuyerEmail] = useState<string>(currentUser.email);
-  const [buyerPhone, setBuyerPhone] = useState<string>(currentUser.phone);
+  // Buyer / Penanggung Jawab Info (kosong untuk diisi pembeli asli)
+  const [buyerName, setBuyerName] = useState<string>('');
+  const [buyerEmail, setBuyerEmail] = useState<string>('');
+  const [buyerPhone, setBuyerPhone] = useState<string>('');
 
   // Attendees list automatically sized to packageCapacity
   const [attendees, setAttendees] = useState<AttendeeData[]>([
-    { name: currentUser.name, email: currentUser.email, phone: currentUser.phone, nik: '' },
+    { name: '', email: '', phone: '', nik: '' },
   ]);
 
   const [formError, setFormError] = useState<string | null>(null);

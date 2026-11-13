@@ -118,7 +118,7 @@ class StorageService {
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
     }
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID)) {
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_admin');
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_cust');
     }
     if (!localStorage.getItem(STORAGE_KEYS.LOGS)) {
       localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(isCleared ? [] : INITIAL_LOGS));
@@ -294,8 +294,8 @@ class StorageService {
 
   public getCurrentUser(): User {
     const users = this.getUsers();
-    const currentId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || 'usr_admin';
-    return users.find((u) => u.id === currentId) || users[0];
+    const currentId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || 'usr_cust';
+    return users.find((u) => u.id === currentId) || users.find((u) => u.role === 'customer') || users[0];
   }
 
   public setCurrentUser(userId: string) {
@@ -307,7 +307,12 @@ class StorageService {
   public getEvents(): Event[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.EVENTS);
-      return data ? JSON.parse(data) : INITIAL_EVENTS;
+      const parsed: Event[] = data ? JSON.parse(data) : INITIAL_EVENTS;
+      return parsed.map((evt) =>
+        evt.id === 'evt_alas_cerita_2026'
+          ? { ...evt, posterUrl: '/assets/aistudio/alas-cerita-poster_fb646400.jpeg' }
+          : evt
+      );
     } catch {
       return INITIAL_EVENTS;
     }

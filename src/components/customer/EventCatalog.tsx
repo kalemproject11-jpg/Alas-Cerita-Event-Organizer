@@ -111,30 +111,15 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
             </div>
           </div>
 
-          {/* Right Poster Column: stretches cleanly to match left height on laptop */}
-          <div className="lg:col-span-5 flex">
-            <div className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-pink-500/35 shadow-2xl group bg-[#160b15] min-h-[240px] sm:min-h-[300px] lg:min-h-full">
+          {/* Right Poster Column: Displays full portrait poster cleanly without cropping */}
+          <div className="lg:col-span-5 flex items-center justify-center">
+            <div className="relative w-full max-w-sm lg:max-w-full mx-auto rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-pink-400/45 shadow-2xl shadow-pink-950/50 bg-[#160b15]">
               <img
                 src={alasCeritaEvent.posterUrl}
                 alt="Poster Alas Cerita — Our Philosophy"
                 referrerPolicy="no-referrer"
-                className="w-full h-full aspect-16/10 lg:aspect-auto object-cover group-hover:scale-105 transition-transform duration-700"
+                className="w-full h-auto object-contain block"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#1a0e19] via-[#1a0e19]/30 to-transparent" />
-
-              <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4 p-3 sm:p-3.5 bg-[#200f1c]/95 backdrop-blur-md rounded-2xl border border-pink-500/30 flex items-center gap-3">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-white p-1 shrink-0 overflow-hidden shadow-sm border border-amber-300">
-                  <img src="/alas-cerita-logo.jpg" alt="Alas Cerita" className="w-full h-full object-contain" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[11px] font-mono text-[#FACC15] block font-bold truncate">
-                    Alas Cerita — Our Philosophy
-                  </span>
-                  <span className="text-xs text-stone-300 block truncate">
-                    Kalura Secret Garden &middot; Creative Gathering &amp; Painting
-                  </span>
-                </div>
-              </div>
             </div>
           </div>
         </div>

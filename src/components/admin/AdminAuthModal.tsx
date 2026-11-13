@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Lock, KeyRound, AlertCircle, ArrowRight, X, User, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Lock, KeyRound, AlertCircle, ArrowRight, X, User } from 'lucide-react';
 import { User as UserType } from '../../types';
 
 interface AdminAuthModalProps {
@@ -15,9 +15,17 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   onSuccessLogin,
   users,
 }) => {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setUsername('');
+      setPassword('');
+      setErrorMessage(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -31,47 +39,37 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = password.trim();
 
-    // Verify username admin and password admin
+    if (!cleanUser || !cleanPass) {
+      setErrorMessage('Masukkan username dan password terlebih dahulu.');
+      return;
+    }
+
     if (
       (cleanUser === 'admin' && cleanPass === 'admin') ||
-      (cleanUser === 'admin@alascerita.id' && cleanPass === 'admin') ||
-      cleanPass === '1234'
+      (cleanUser === 'admin@alascerita.id' && cleanPass === 'admin')
     ) {
       onSuccessLogin(superAdmin);
       onClose();
       return;
     }
 
-    // Check staff accounts (e.g. rian.gate, siti.supervisor)
     const staffMatch = adminUsers.find(
       (u) =>
         u.email.toLowerCase() === cleanUser ||
-        u.name.toLowerCase().includes(cleanUser)
+        u.name.toLowerCase() === cleanUser
     );
-    if (staffMatch && (cleanPass === 'admin' || cleanPass === '1234')) {
+    if (staffMatch && cleanPass === 'admin') {
       onSuccessLogin(staffMatch);
       onClose();
       return;
     }
 
-    setErrorMessage('Username atau password salah. Gunakan username: admin dan password: admin');
-  };
-
-  const handleQuickLogin = (userToLogin: UserType) => {
-    onSuccessLogin(userToLogin);
-    onClose();
-  };
-
-  const handleAutoFill = () => {
-    setUsername('admin');
-    setPassword('admin');
-    setErrorMessage(null);
+    setErrorMessage('Username atau password salah. Silakan periksa kembali.');
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="relative w-full max-w-md bg-[#1c0f1c] border-2 border-pink-500/35 rounded-3xl shadow-2xl p-5 sm:p-8 space-y-5">
-        
+      <div className="relative w-full max-w-md bg-[#1c0f1c] border-2 border-pink-500/35 rounded-3xl shadow-2xl p-5 sm:p-8 space-y-6">
         {/* Close Button */}
         <button
           type="button"
@@ -95,45 +93,26 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
             </span>
             <h2 className="text-xl font-black text-white">Login Portal Admin</h2>
             <p className="text-xs text-stone-300 mt-1">
-              Verifikasi pembayaran, unduh E-Ticket, Gate Scanner, dan kontrol database khusus Panitia Resmi Alas Cerita.
+              Masukkan username dan password panitia resmi Alas Cerita untuk mengakses dashboard.
             </p>
           </div>
         </div>
 
-        {/* Credentials Info Box */}
-        <div className="p-3 bg-[#251323]/90 border border-amber-400/35 rounded-2xl flex items-center justify-between gap-3 text-xs">
-          <div className="space-y-0.5">
-            <span className="text-[10px] uppercase font-mono tracking-wider text-[#FACC15] font-bold block">
-              Kredensial Akses Admin:
-            </span>
-            <div className="font-mono text-stone-200 text-xs">
-              User: <strong className="text-white">admin</strong>
-              <span className="mx-1.5 text-pink-400/50">&middot;</span>
-              Pass: <strong className="text-white">admin</strong>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleAutoFill}
-            className="text-[11px] px-3 py-1.5 bg-pink-500/20 hover:bg-pink-500/30 text-pink-200 font-semibold rounded-lg border border-pink-400/40 transition-colors shrink-0 cursor-pointer"
-          >
-            Auto Isi
-          </button>
-        </div>
-
         {/* Login Form */}
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
           <div>
-            <label className="text-xs font-semibold text-stone-200 block mb-1.5">
-              Username Admin:
+            <label htmlFor="admin-username" className="text-xs font-semibold text-stone-200 block mb-1.5">
+              Username Admin
             </label>
             <div className="relative">
               <User className="w-4 h-4 text-pink-400/70 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
+                id="admin-username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Masukkan username (admin)"
+                placeholder="Masukkan username"
+                autoComplete="off"
                 className="w-full pl-10 pr-4 py-2.5 text-sm bg-[#150914] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400"
                 autoFocus
                 required
@@ -142,19 +121,18 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold text-stone-200">
-                Password Admin:
-              </label>
-              <span className="text-[10px] font-mono text-stone-400">Default: admin</span>
-            </div>
+            <label htmlFor="admin-password" className="text-xs font-semibold text-stone-200 block mb-1.5">
+              Password Admin
+            </label>
             <div className="relative">
               <KeyRound className="w-4 h-4 text-pink-400/70 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
+                id="admin-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Masukkan password (admin)"
+                placeholder="Masukkan password"
+                autoComplete="new-password"
                 className="w-full pl-10 pr-4 py-2.5 text-sm bg-[#150914] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400"
                 required
               />
@@ -176,29 +154,6 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
-
-        {/* Quick 1-Click Staff Login */}
-        <div className="pt-2 border-t border-pink-900/40 space-y-2">
-          <span className="text-[11px] font-mono text-stone-400 block text-center uppercase tracking-wider">
-            Masuk Cepat Petugas
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickLogin(superAdmin)}
-              className="px-3 py-2.5 bg-[#251323] hover:bg-[#341a32] border border-pink-500/25 text-stone-200 rounded-xl text-xs font-medium transition-colors text-center cursor-pointer truncate"
-            >
-              Super Admin (EO)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin(adminUsers.find((u) => u.role === 'gate_staff') || superAdmin)}
-              className="px-3 py-2.5 bg-[#251323] hover:bg-[#341a32] border border-pink-500/25 text-stone-200 rounded-xl text-xs font-medium transition-colors text-center cursor-pointer truncate"
-            >
-              Petugas Gate Scanner
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
