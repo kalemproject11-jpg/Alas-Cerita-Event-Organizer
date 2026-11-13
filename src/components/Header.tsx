@@ -4,7 +4,6 @@ import {
   Lock,
   LayoutDashboard,
   LogOut,
-  CalendarDays
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -26,41 +25,33 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="border-b border-pink-500/25 bg-[#1a0e1a]/95 backdrop-blur-md sticky top-0 z-40 shadow-lg shadow-pink-950/20 no-print">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4 lg:gap-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4 lg:gap-8">
         {/* Zone 1: Brand Wordmark & Logo */}
         <button
           type="button"
           onClick={() => onSelectTab('catalog')}
-          className="flex items-center gap-2.5 sm:gap-3 shrink-0 text-left group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 rounded-xl"
+          className="flex items-center gap-2 sm:gap-3 shrink-0 text-left group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 rounded-xl"
         >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white p-1 shadow-md shadow-pink-500/20 flex items-center justify-center overflow-hidden border border-amber-300 shrink-0">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white p-1 shadow-md shadow-pink-500/20 flex items-center justify-center overflow-hidden border border-amber-300 shrink-0">
             <img
               src="/alas-cerita-logo.jpg"
               alt="Logo Alas Cerita"
               className="w-full h-full object-contain"
             />
           </div>
-          <span className="text-base sm:text-lg font-black tracking-tight bg-gradient-to-r from-pink-300 via-rose-200 to-amber-300 bg-clip-text text-transparent group-hover:brightness-110 transition-all whitespace-nowrap shrink-0">
-            Alas Cerita
-          </span>
+          <div className="flex flex-col leading-tight min-w-0">
+            <span className="text-sm sm:text-lg font-black tracking-tight bg-gradient-to-r from-pink-300 via-rose-200 to-amber-300 bg-clip-text text-transparent group-hover:brightness-110 transition-all whitespace-nowrap">
+              Alas Cerita
+            </span>
+            <span className="text-[9.5px] sm:text-[11px] font-medium tracking-wide text-amber-200/90 whitespace-nowrap">
+              Creative Picnic Gathering
+            </span>
+          </div>
         </button>
 
-        {/* Zone 2: Single-line Navigation Links */}
-        <nav className="flex items-center gap-3 sm:gap-6 text-xs sm:text-sm font-medium min-w-0">
-          <button
-            type="button"
-            onClick={() => onSelectTab('catalog')}
-            className={`whitespace-nowrap shrink-0 flex items-center gap-1.5 py-1.5 transition-colors cursor-pointer ${
-              activeTab === 'catalog'
-                ? 'text-pink-300 border-b-2 border-pink-400 font-bold'
-                : 'text-stone-300 hover:text-pink-200'
-            }`}
-          >
-            <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pink-400 shrink-0" />
-            <span>Katalog Event</span>
-          </button>
-
-          {isAdminOrStaff && (
+        {/* Zone 2: Admin Navigation Link (shown only when logged in as staff/admin) */}
+        {isAdminOrStaff && (
+          <nav className="flex items-center gap-2 sm:gap-6 text-xs sm:text-sm font-medium min-w-0">
             <button
               type="button"
               onClick={() => onSelectTab('admin_dashboard')}
@@ -74,8 +65,8 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="sm:hidden">Portal Admin</span>
               <span className="hidden sm:inline">Portal Admin &amp; Gate</span>
             </button>
-          )}
-        </nav>
+          </nav>
+        )}
 
         {/* Zone 3: Primary Action */}
         <div className="flex items-center gap-2 shrink-0">

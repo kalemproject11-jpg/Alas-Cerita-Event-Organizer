@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Event, TicketType } from '../../types';
-import { ArrowRight, ShieldCheck, Check } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Check, PhoneCall, ChevronDown, MessageCircle } from 'lucide-react';
 
 interface EventCatalogProps {
   events: Event[];
@@ -16,6 +16,30 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
 }) => {
   const alasCeritaEvent = events.find((e) => e.id === 'evt_alas_cerita_2026') || events[0];
   const alasCeritaTiers = ticketTypes.filter((t) => t.eventId === alasCeritaEvent?.id);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
+  const faqItems = [
+    {
+      question: 'Kapan e-ticket saya diterbitkan?',
+      answer:
+        'Setelah bukti QRIS diperiksa dan pembayaran diterima admin, e-ticket setiap peserta siap dikirim melalui email.',
+    },
+    {
+      question: 'Apakah tiket dapat dipindahtangankan?',
+      answer:
+        'Informasi lengkap tersedia pada syarat dan ketentuan event. Hubungi Admin Alas Cerita di nomor di bawah ini bila membutuhkan bantuan.',
+    },
+    {
+      question: 'Metode pembayaran apa yang tersedia?',
+      answer:
+        'Informasi lengkap tersedia pada syarat dan ketentuan event. Hubungi Admin Alas Cerita di nomor di bawah ini bila membutuhkan bantuan.',
+    },
+    {
+      question: 'Bagaimana jika pembayaran saya gagal?',
+      answer:
+        'Informasi lengkap tersedia pada syarat dan ketentuan event. Hubungi Admin Alas Cerita di nomor di bawah ini bila membutuhkan bantuan.',
+    },
+  ];
 
   const allFacilities = [
     'Jajanan Pasar',
@@ -44,10 +68,8 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm font-mono">
                   <span className="tracking-wider uppercase text-[#FACC15] font-black">
-                    Talkshow: Rerasan Mawi Makna
+                    TALK SHOW - MINI WORKSHOP - KERONCONG MUSIC PERFORMANCE
                   </span>
-                  <span className="text-pink-400/60" aria-hidden="true">&middot;</span>
-                  <span className="text-pink-300 font-bold">Alas Cerita EO</span>
                 </div>
                 <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-[1.12] text-balance">
                   “Duduk Sejenak, Leren Kepenak”
@@ -243,26 +265,149 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
         </div>
       </section>
 
-      {/* 3. OFFICIAL PAYMENT & ADMISSION GUARANTEE BANNER */}
-      <div className="p-5 sm:p-6 bg-gradient-to-r from-[#2a1323] via-[#21141c] to-[#2c2010] border border-pink-500/30 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl shadow-pink-950/20">
-        <div className="flex items-start sm:items-center gap-3.5">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-pink-500/15 border border-pink-500/30 flex items-center justify-center text-pink-300 shrink-0">
-            <ShieldCheck className="w-5 h-5" />
+      {/* 3. OFFICIAL PAYMENT & CONTACT PERSON BANNER */}
+      <div className="space-y-4">
+        <div className="p-5 sm:p-6 bg-gradient-to-r from-[#2a1323] via-[#21141c] to-[#2c2010] border border-pink-500/30 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl shadow-pink-950/20">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-pink-500/15 border border-pink-500/30 flex items-center justify-center text-pink-300 shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div className="space-y-0.5">
+              <h4 className="text-sm font-bold text-white">
+                Metode Pembayaran Resmi: QRIS, ShopeePay, dan Bank BRI
+              </h4>
+              <p className="text-xs text-stone-300 leading-relaxed">
+                Setelah bukti transfer diunggah, panitia melakukan verifikasi dan mengirimkan E-Ticket resmi ke email Anda maksimal 1 &times; 24 jam.
+              </p>
+            </div>
           </div>
-          <div className="space-y-0.5">
-            <h4 className="text-sm font-bold text-white">
-              Metode Pembayaran Resmi: QRIS, ShopeePay, dan Bank BRI
-            </h4>
-            <p className="text-xs text-stone-300 leading-relaxed">
-              Setelah bukti transfer diunggah, panitia melakukan verifikasi dan mengirimkan E-Ticket resmi ke email Anda maksimal 1 &times; 24 jam.
-            </p>
-          </div>
+
+          <span className="text-xs font-mono font-bold text-amber-300 shrink-0">
+            100% Tiket Resmi
+          </span>
         </div>
 
-        <span className="text-xs font-mono font-bold text-amber-300 shrink-0">
-          100% Tiket Resmi
-        </span>
+        {/* Contact Person Card */}
+        <a
+          href="tel:081936553249"
+          className="group p-5 sm:p-6 bg-gradient-to-r from-[#251323] via-[#22141e] to-[#2a1f10] border border-amber-400/35 hover:border-amber-300/80 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl shadow-pink-950/20 transition-all"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-400/15 border border-amber-400/40 flex items-center justify-center text-amber-300 group-hover:scale-105 transition-transform shrink-0">
+              <PhoneCall className="w-5 h-5" />
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-pink-300 block">
+                Contact Person
+              </span>
+              <span className="text-lg sm:text-xl font-black font-mono text-[#FACC15] group-hover:text-amber-200 tracking-wide block tabular-nums">
+                0819-3655-3249
+              </span>
+              <span className="text-xs text-stone-200 font-semibold block">
+                Admin Alas Cerita
+              </span>
+            </div>
+          </div>
+
+          <span className="text-xs font-mono font-semibold text-pink-200 bg-pink-950/70 border border-pink-500/35 px-3.5 py-2 rounded-xl group-hover:bg-pink-900/70 transition-colors shrink-0">
+            Ketuk nomor untuk menelepon
+          </span>
+        </a>
       </div>
+
+      {/* 4. FAQ SECTION (PERTANYAAN UMUM) */}
+      <section className="p-5 sm:p-8 lg:p-10 rounded-3xl bg-gradient-to-br from-[#281324] via-[#20121d] to-[#291e10] border border-pink-500/30 shadow-2xl shadow-pink-950/25 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-pink-500/20 pb-5">
+          <div className="space-y-1.5">
+            <span className="text-xs font-mono font-bold tracking-widest uppercase text-amber-300 block">
+              PERTANYAAN UMUM
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              Semua yang perlu kamu tahu.
+            </h2>
+            <p className="text-xs sm:text-sm text-stone-300">
+              Butuh bantuan lain? Tim kami siap membantu melalui WhatsApp.
+            </p>
+          </div>
+
+          <a
+            href="https://wa.me/6281936553249"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:brightness-110 text-stone-950 text-xs font-black rounded-xl transition-all shadow-md shadow-pink-500/25 shrink-0 whitespace-nowrap"
+          >
+            <MessageCircle className="w-4 h-4 shrink-0" />
+            <span>Chat WhatsApp Admin</span>
+          </a>
+        </div>
+
+        <div className="space-y-3">
+          {faqItems.map((item, idx) => {
+            const isOpen = openFaqIndex === idx;
+            return (
+              <div
+                key={idx}
+                className={`rounded-2xl border transition-all overflow-hidden ${
+                  isOpen
+                    ? 'bg-[#1a0d18]/95 border-amber-400/50 shadow-md shadow-pink-950/30'
+                    : 'bg-[#1d0f1b]/80 border-pink-500/25 hover:border-pink-400/50'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                  aria-expanded={isOpen}
+                  className="w-full px-4 sm:px-5 py-4 flex items-center justify-between gap-4 text-left cursor-pointer"
+                >
+                  <span className="text-xs sm:text-sm font-bold text-white">
+                    {item.question}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-amber-300 shrink-0 transition-transform duration-200 ${
+                      isOpen ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+                {isOpen && (
+                  <div className="px-4 sm:px-5 pb-4 pt-3 text-xs sm:text-sm text-stone-300 leading-relaxed border-t border-pink-500/15 mt-0.5">
+                    {item.answer}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Bottom Admin Contact Strip referenced by FAQ answers */}
+        <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-[#170a16]/90 border border-pink-500/25 rounded-2xl p-4">
+          <div className="space-y-0.5">
+            <span className="text-pink-200 font-semibold block">
+              Admin Alas Cerita
+            </span>
+            <span className="text-stone-400 text-[11px] block">
+              Hubungi langsung via WhatsApp atau telepon jika mengalami kendala pembayaran atau tiket.
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <a
+              href="https://wa.me/6281936553249"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-2 bg-pink-950/80 hover:bg-pink-900 border border-pink-500/40 text-pink-200 font-mono font-bold rounded-xl transition-colors inline-flex items-center gap-1.5"
+            >
+              <MessageCircle className="w-3.5 h-3.5 text-amber-300" />
+              <span>0819-3655-3249</span>
+            </a>
+            <a
+              href="tel:081936553249"
+              className="px-3.5 py-2 bg-amber-400/15 hover:bg-amber-400/25 border border-amber-400/40 text-amber-300 font-mono font-bold rounded-xl transition-colors inline-flex items-center gap-1.5"
+            >
+              <PhoneCall className="w-3.5 h-3.5" />
+              <span>Telepon Admin</span>
+            </a>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };
