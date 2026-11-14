@@ -369,7 +369,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                             {b.quantity} Paket ({relatedTickets.length} Peserta)
                           </span>
                           <span className="text-[11px] text-emerald-300 block font-mono font-black">
-                            Rp{b.totalAmount.toLocaleString('id-ID')}
+                            Rp. {b.totalAmount.toLocaleString('id-ID')}
                           </span>
                         </div>
 

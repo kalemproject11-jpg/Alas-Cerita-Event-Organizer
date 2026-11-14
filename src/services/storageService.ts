@@ -101,6 +101,7 @@ class StorageService {
   private ticketTypesCache: TicketType[] | null = null;
   private logsCache: CheckInLog[] | null = null;
   private pendingAttendeesMap: Map<string, Array<{ name: string; email: string; phone: string; origin: string }>> = new Map();
+  private syncedBookingPriceIds: Set<string> = new Set();
 
   constructor() {
     this.initializeDefaults();
@@ -136,8 +137,9 @@ class StorageService {
         const list: Booking[] = [];
         snapshot.forEach((d) => list.push(d.data() as Booking));
         list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        this.bookingsCache = list;
-        safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, list);
+        const reconciled = this.reconcileSingleBookingPrices(list, true);
+        this.bookingsCache = reconciled;
+        safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, reconciled);
         this.notify();
       }, (err) => logFirestoreError(err, 'list', 'bookings'));
 
@@ -510,6 +512,52 @@ class StorageService {
     this.notify();
   }
 
+  /**
+   * Reconciles Single bookings #1–#13 so any earlier Rs/Rp 80.000 entries are
+   * adjusted to Rp 70.000 both locally and in Cloud Firestore, updating Total Omset.
+   */
+  private reconcileSingleBookingPrices(bookings: Booking[], syncFirestore = false): Booking[] {
+    const singleSorted = [...bookings]
+      .filter((b) => {
+        if (b.paymentStatus === 'expired') return false;
+        const isExplicitSingle = b.ticketTypeId === 'tt_alas_single';
+        const isLegacySingle =
+          !b.ticketTypeId?.includes('couple') &&
+          !b.ticketTypeId?.includes('circle') &&
+          b.totalAmount === SINGLE_REGULAR_PRICE &&
+          (b.quantity || 1) === 1;
+        return isExplicitSingle || isLegacySingle;
+      })
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+    const priceOverrides = new Map<string, number>();
+    let slotCursor = 0;
+
+    for (const b of singleSorted) {
+      const qty = Math.max(1, b.quantity || 1);
+      const startSlot = slotCursor;
+      slotCursor += qty;
+
+      if (startSlot < SINGLE_PROMO_LIMIT) {
+        const expectedAmount = this.calculateSingleTotal(qty, startSlot);
+        if (b.totalAmount > expectedAmount) {
+          priceOverrides.set(b.id, expectedAmount);
+          if (syncFirestore && !this.syncedBookingPriceIds.has(b.id)) {
+            this.syncedBookingPriceIds.add(b.id);
+            updateDoc(doc(db, 'bookings', b.id), { totalAmount: expectedAmount }).catch((err) =>
+              logFirestoreError(err, 'update', `bookings/${b.id}`)
+            );
+          }
+        }
+      }
+    }
+
+    if (priceOverrides.size === 0) return bookings;
+    return bookings.map((b) =>
+      priceOverrides.has(b.id) ? { ...b, totalAmount: priceOverrides.get(b.id)! } : b
+    );
+  }
+
   // --- Bookings & Concurrency Quota Hold (FR-BKG-02) ---
   public getBookings(): Booking[] {
     try {
@@ -517,9 +565,10 @@ class StorageService {
       const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
       const data = localStorage.getItem(STORAGE_KEYS.BOOKINGS);
       if (data !== null) {
-        const parsed = JSON.parse(data);
-        this.bookingsCache = parsed;
-        return parsed;
+        const parsed: Booking[] = JSON.parse(data);
+        const reconciled = this.reconcileSingleBookingPrices(parsed, true);
+        this.bookingsCache = reconciled;
+        return reconciled;
       }
       return isCleared ? [] : INITIAL_BOOKINGS;
     } catch {
