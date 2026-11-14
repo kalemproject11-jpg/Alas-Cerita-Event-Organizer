@@ -3,6 +3,7 @@ import { Booking, IssuedTicket, Event, PaymentMethod, User } from '../../types';
 import { storageService } from '../../services/storageService';
 import { downloadTicketAsPNG } from '../../utils/ticketDownloader';
 import { ETicketModal } from '../customer/ETicketModal';
+import { CopyButton } from '../common/CopyButton';
 import { 
   Download, 
   Search, 
@@ -357,10 +358,17 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
 
                       {/* Buyer details */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
-                        <div>
+                        <div className="min-w-0 space-y-0.5">
                           <span className="text-[10px] text-pink-300/60 block font-mono">Data Pemesan:</span>
-                          <span className="font-bold text-white truncate block">{b.customerName}</span>
-                          <span className="text-[11px] text-stone-300 font-mono">{b.customerPhone} &bull; {b.customerEmail}</span>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-bold text-white truncate">{b.customerName}</span>
+                            <CopyButton text={b.customerName} label="Salin nama pemesan" showLabel />
+                          </div>
+                          <span className="text-[11px] text-stone-300 font-mono block">{b.customerPhone}</span>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-[11px] text-pink-200/90 font-mono truncate">{b.customerEmail}</span>
+                            <CopyButton text={b.customerEmail} label="Salin email pemesan" showLabel />
+                          </div>
                         </div>
 
                         <div>
@@ -399,9 +407,10 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                                 className="p-2.5 bg-[#170a16] rounded-2xl border border-pink-500/25 flex items-center justify-between gap-2"
                               >
                                 <div className="min-w-0 space-y-0.5 text-xs">
-                                  <div className="flex items-center gap-2 flex-wrap">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="font-mono font-bold text-pink-300 text-[11px]">{t.ticketNumber}</span>
                                     <span className="font-bold text-white truncate">{t.attendeeName}</span>
+                                    <CopyButton text={t.attendeeName} label="Salin nama peserta" />
                                     {t.packageName && (
                                       <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-400 text-stone-950">
                                         Paket {t.packageName} #{t.packageMemberIndex || 1}/{t.packageTotalMembers || 1}
@@ -414,6 +423,13 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                                     <span>&bull;</span>
                                     <span>HP: {t.attendeePhone || '-'}</span>
                                   </div>
+
+                                  {t.attendeeEmail && (
+                                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-pink-200/80 min-w-0">
+                                      <span className="truncate">{t.attendeeEmail}</span>
+                                      <CopyButton text={t.attendeeEmail} label="Salin email peserta" />
+                                    </div>
+                                  )}
                                 </div>
 
                                 {/* Download & Preview Action */}
@@ -571,7 +587,10 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                             </span>
                           )}
                         </div>
-                        <h3 className="text-sm font-bold text-white mt-1.5">{t.attendeeName}</h3>
+                        <div className="flex items-center gap-2 mt-1.5 min-w-0">
+                          <h3 className="text-sm font-bold text-white truncate">{t.attendeeName}</h3>
+                          <CopyButton text={t.attendeeName} label="Salin nama peserta" showLabel />
+                        </div>
                       </div>
 
                       {isCheckedIn ? (
@@ -598,9 +617,12 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                         <span className="text-pink-300/60">No. HP:</span>
                         <span className="text-stone-200">{t.attendeePhone || '-'}</span>
                       </div>
-                      <div className="flex justify-between gap-2">
-                        <span className="text-pink-300/60">Email:</span>
-                        <span className="text-stone-200 truncate">{t.attendeeEmail || '-'}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-pink-300/60 shrink-0">Email:</span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-stone-200 truncate">{t.attendeeEmail || '-'}</span>
+                          <CopyButton text={t.attendeeEmail} label="Salin email peserta" showLabel />
+                        </div>
                       </div>
                       <div className="flex justify-between gap-2">
                         <span className="text-pink-300/60">Pemesan:</span>
@@ -684,14 +706,20 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                             </span>
                           </td>
                           <td className="px-4 py-3.5 font-bold text-white text-xs whitespace-nowrap">
-                            {t.attendeeName}
+                            <div className="inline-flex items-center gap-1.5">
+                              <span>{t.attendeeName}</span>
+                              <CopyButton text={t.attendeeName} label="Salin nama peserta" />
+                            </div>
                           </td>
                           <td className="px-4 py-3.5 text-emerald-300 text-xs font-medium max-w-[200px] truncate">
                             {t.attendeeOrigin || t.attendeeNik || '-'}
                           </td>
                           <td className="px-4 py-3.5 text-stone-200 text-xs whitespace-nowrap space-y-0.5 font-mono">
                             <div>{t.attendeePhone || '-'}</div>
-                            <div className="text-pink-300/70 text-[11px]">{t.attendeeEmail || '-'}</div>
+                            <div className="flex items-center gap-1.5 text-pink-300/80 text-[11px]">
+                              <span>{t.attendeeEmail || '-'}</span>
+                              <CopyButton text={t.attendeeEmail} label="Salin email peserta" />
+                            </div>
                           </td>
                           <td className="px-4 py-3.5 whitespace-nowrap">
                             {t.packageName ? (

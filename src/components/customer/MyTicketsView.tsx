@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { IssuedTicket, Event, User } from '../../types';
 import { ETicketModal } from './ETicketModal';
+import { CopyButton } from '../common/CopyButton';
 import { Ticket, QrCode, Calendar, MapPin, CheckCircle2, Clock, Eye, AlertCircle, Download } from 'lucide-react';
 import { downloadTicketAsPNG } from '../../utils/ticketDownloader';
 
@@ -103,9 +104,12 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({
                     </h3>
 
                     <div className="p-3 bg-[#170a16] rounded-xl border border-pink-500/20 space-y-1.5 text-xs min-w-0">
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="text-pink-300/60 shrink-0">Pengunjung:</span>
-                        <span className="text-white font-bold text-right break-words min-w-0">{ticket.attendeeName}</span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-white font-bold text-right break-words min-w-0">{ticket.attendeeName}</span>
+                          <CopyButton text={ticket.attendeeName} label="Salin nama pengunjung" />
+                        </div>
                       </div>
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-pink-300/60 shrink-0">Kategori:</span>
@@ -117,9 +121,12 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({
                           {ticket.attendeeOrigin || ticket.attendeeNik || '-'}
                         </span>
                       </div>
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="text-pink-300/60 shrink-0">Email:</span>
-                        <span className="text-stone-300 font-mono text-right break-all min-w-0">{ticket.attendeeEmail}</span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-stone-300 font-mono text-right break-all min-w-0">{ticket.attendeeEmail}</span>
+                          <CopyButton text={ticket.attendeeEmail} label="Salin email pengunjung" />
+                        </div>
                       </div>
                       {ticket.packageName && (
                         <div className="flex items-start justify-between gap-2 pt-1 border-t border-pink-900/30 text-[11px]">
