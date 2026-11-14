@@ -112,8 +112,11 @@ export async function downloadTicketAsPNG(ticket: IssuedTicket, event: Event): P
   const innerWidth = boxWidth - padX * 2; // 612px
 
   // --- Measure Event Box ---
-  const rawTitle = event.title || 'Alas Cerita — “Duduk Sejenak, Leren Kepenak”';
-  mCtx.font = 'bold 19px sans-serif';
+  const rawTitle =
+    !event.title || event.title.includes('Rerasan Mawi Makna')
+      ? 'TALK SHOW • MINI WORKSHOP • KERONCONG MUSIC PERFORMANCE'
+      : event.title;
+  mCtx.font = 'bold 18px sans-serif';
   const titleLines = wrapText(mCtx, rawTitle, innerWidth, 3);
   const titleLineHeight = 25;
 
@@ -192,7 +195,7 @@ export async function downloadTicketAsPNG(ticket: IssuedTicket, event: Event): P
 
   // Compute vertical positions cleanly with consistent 16px gaps
   const headerTop = 24;
-  const headerH = 72;
+  const headerH = 80;
   const eventY = headerTop + headerH + 14;
   const attY = eventY + eventBoxH + 14;
   const qrY = attY + attBoxH + 16;
@@ -229,30 +232,40 @@ export async function downloadTicketAsPNG(ticket: IssuedTicket, event: Event): P
   ctx.fillStyle = '#281325';
   ctx.fillRect(24, headerTop, w - 48, headerH);
 
+  const headerBrandText = 'ALAS CERITA PICNIC GATHERING 2026';
+  const headerBrandSize = fitSingleLineFontSize(
+    ctx,
+    headerBrandText,
+    '900',
+    21,
+    15,
+    'sans-serif',
+    475
+  );
   ctx.fillStyle = '#FF579F';
-  ctx.font = 'bold 12px monospace';
-  ctx.fillText('ALAS CERITA EVENT ORGANIZER', 42, headerTop + 26, 440);
+  ctx.font = `900 ${headerBrandSize}px sans-serif`;
+  ctx.fillText(headerBrandText, 42, headerTop + 34, 475);
 
   const headerTitleSize = fitSingleLineFontSize(
     ctx,
     'OFFICIAL E-TICKET PASS · TIKET MASUK RESMI',
     'bold',
-    17,
-    13,
+    14,
+    11,
     'sans-serif',
-    450
+    475
   );
   ctx.fillStyle = '#ffffff';
   ctx.font = `bold ${headerTitleSize}px sans-serif`;
-  ctx.fillText('OFFICIAL E-TICKET PASS · TIKET MASUK RESMI', 42, headerTop + 52, 450);
+  ctx.fillText('OFFICIAL E-TICKET PASS · TIKET MASUK RESMI', 42, headerTop + 60, 475);
 
   ctx.fillStyle = '#34D399';
   ctx.font = 'bold 12px monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('VERIFIED PASS', w - 42, headerTop + 28, 170);
+  ctx.fillText('VERIFIED PASS', w - 42, headerTop + 32, 170);
   ctx.fillStyle = '#f9a8d4';
   ctx.font = '11px monospace';
-  ctx.fillText('ONE-TIME SCAN ONLY', w - 42, headerTop + 50, 170);
+  ctx.fillText('ONE-TIME SCAN ONLY', w - 42, headerTop + 56, 170);
   ctx.textAlign = 'left';
 
   // Event Details Box
@@ -269,7 +282,7 @@ export async function downloadTicketAsPNG(ticket: IssuedTicket, event: Event): P
 
   cursorY += 26;
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 19px sans-serif';
+  ctx.font = 'bold 18px sans-serif';
   titleLines.forEach((line) => {
     ctx.fillText(line, innerLeft, cursorY, innerWidth);
     cursorY += titleLineHeight;

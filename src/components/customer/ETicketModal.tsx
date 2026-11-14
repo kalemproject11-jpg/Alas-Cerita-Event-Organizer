@@ -82,10 +82,10 @@ export const ETicketModal: React.FC<ETicketModalProps> = ({ ticket, event, onClo
           {/* Ticket Header & Status */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-pink-900/30">
             <div className="min-w-0 flex-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-300 block">
-                {event.category} FESTIVAL PASS
+              <span className="text-sm sm:text-base font-black uppercase tracking-wider text-pink-400 block">
+                ALAS CERITA PICNIC GATHERING 2026
               </span>
-              <h2 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-pink-300 via-pink-200 to-emerald-300 bg-clip-text text-transparent mt-0.5 break-words">{event.title}</h2>
+              <h2 className="text-lg sm:text-xl font-black bg-gradient-to-r from-pink-300 via-pink-200 to-emerald-300 bg-clip-text text-transparent mt-0.5 break-words">{event.title}</h2>
               <p className="text-xs text-pink-300/70 mt-1 break-words">{event.organizer}</p>
             </div>
 

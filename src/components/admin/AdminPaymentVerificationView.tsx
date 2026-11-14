@@ -60,7 +60,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
 
   const currentEvent = events[0] || {
     id: 'evt_alas_cerita_2026',
-    title: 'Alas Cerita — Talkshow: Rerasan Mawi Makna “Duduk Sejenak, Leren Kepenak”',
+    title: 'TALK SHOW • MINI WORKSHOP • KERONCONG MUSIC PERFORMANCE',
     venue: 'Kalura Secret Garden',
     city: 'Yogyakarta',
   };

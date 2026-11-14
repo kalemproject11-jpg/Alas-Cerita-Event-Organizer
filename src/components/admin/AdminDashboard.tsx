@@ -299,8 +299,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {currentEventTiers.map((tier) => {
-                  const sold = tier.quota - tier.availableQuota;
-                  const percentSold = tier.quota > 0 ? Math.round((sold / tier.quota) * 100) : 0;
+                  const isSingleTier = tier.id === 'tt_alas_single' || tier.name.toLowerCase().includes('single');
+                  const singleInfo = isSingleTier ? storageService.getSinglePricingInfo() : null;
+                  const sold = isSingleTier && singleInfo
+                    ? singleInfo.registeredCount
+                    : Math.max(0, tier.quota - tier.availableQuota);
+                  const remaining = Math.max(0, tier.quota - sold);
+                  const percentSold = tier.quota > 0 ? Math.min(100, Math.round((sold / tier.quota) * 100)) : 0;
 
                   return (
                     <div
@@ -317,7 +322,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       {/* Quota Progress Bar */}
                       <div className="space-y-1.5">
                         <div className="flex justify-between text-[11px] text-stone-400 font-mono">
-                          <span>Terjual: {sold} / {tier.quota}</span>
+                          <span>Terdaftar: {sold} / {tier.quota}</span>
                           <span>{percentSold}%</span>
                         </div>
                         <div className="w-full h-2 bg-stone-800 rounded-full overflow-hidden">
@@ -336,10 +341,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                       <div className="flex items-center justify-between text-[11px] text-stone-400 pt-1">
                         <span>Sisa Kuota:</span>
-                        <span className={`font-mono font-bold ${tier.availableQuota <= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                          {tier.availableQuota <= 0 ? 'SOLD OUT' : `${tier.availableQuota} lembar`}
+                        <span className={`font-mono font-bold ${remaining <= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          {remaining <= 0 ? 'SOLD OUT' : `${remaining} lembar`}
                         </span>
                       </div>
+
+                      {isSingleTier && singleInfo && (
+                        <div className="pt-2.5 border-t border-pink-500/20 space-y-1.5 text-[11px] font-mono">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-stone-300">Pendaftar 1–13 (Rp70.000):</span>
+                            <span className={`font-bold ${singleInfo.isPromoActive ? 'text-emerald-300' : 'text-stone-400'}`}>
+                              {Math.min(singleInfo.registeredCount, 13)}/13 {singleInfo.isPromoActive ? '· AKTIF' : '· PENUH'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-stone-300">Pendaftar 14+ (Rp80.000):</span>
+                            <span className={`font-bold ${!singleInfo.isPromoActive ? 'text-pink-300' : 'text-stone-400'}`}>
+                              {Math.max(0, singleInfo.registeredCount - 13)} org {!singleInfo.isPromoActive ? '· AKTIF' : ''}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Event, TicketType } from '../../types';
+import { storageService } from '../../services/storageService';
 import { ArrowRight, ShieldCheck, Check, PhoneCall, ChevronDown, MessageCircle } from 'lucide-react';
 
 interface EventCatalogProps {
@@ -16,6 +17,7 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
 }) => {
   const alasCeritaEvent = events.find((e) => e.id === 'evt_alas_cerita_2026') || events[0];
   const alasCeritaTiers = ticketTypes.filter((t) => t.eventId === alasCeritaEvent?.id);
+  const singleInfo = storageService.getSinglePricingInfo();
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   const faqItems = [
@@ -218,7 +220,23 @@ export const EventCatalog: React.FC<EventCatalogProps> = ({
                     </div>
 
                     <p className="text-xs text-stone-300 leading-relaxed">
-                      {tier.description}
+                      {isSingle ? (
+                        singleInfo.isPromoActive ? (
+                          <span>
+                            Pendaftar ke <strong className="text-emerald-300">1–13</strong> seharga{' '}
+                            <strong className="text-white">Rp70.000</strong> (sisa{' '}
+                            <strong className="text-pink-300">{singleInfo.promoRemaining} slot</strong>), lalu pendaftar ke{' '}
+                            <strong className="text-white">14 ke atas</strong> seharga{' '}
+                            <strong className="text-white">Rp80.000</strong>.
+                          </span>
+                        ) : (
+                          <span>
+                            Tarif aktif pendaftar <strong className="text-white">#14 ke atas Rp80.000</strong> (kuota promo pendaftar 1–13 seharga Rp70.000 telah terpenuhi).
+                          </span>
+                        )
+                      ) : (
+                        tier.description
+                      )}
                     </p>
                   </div>
 

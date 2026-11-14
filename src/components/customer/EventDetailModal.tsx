@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Event, TicketType, User } from '../../types';
+import { storageService } from '../../services/storageService';
 import { 
   X, 
   AlertCircle, 
@@ -39,6 +40,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   onProceedToCheckout,
 }) => {
   const eventTiers = ticketTypes.filter((t) => t.eventId === event.id);
+  const singleInfo = storageService.getSinglePricingInfo();
 
   // Helper to determine capacity based on package name
   const getPackageCapacity = (tierName: string): number => {
@@ -238,7 +240,15 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                         Rp{tier.price.toLocaleString('id-ID')}
                       </span>
                       <span className="text-[10px] text-stone-300 block mt-0.5">
-                        {isSingle ? 'Untuk 1 Peserta' : isCouple ? 'Untuk 2 Peserta Sekaligus' : 'Untuk 3 Peserta Sekaligus'}
+                        {isSingle ? (
+                          singleInfo.isPromoActive
+                            ? `Pendaftar #${singleInfo.nextNumber} (1–13: Rp70rb · #14+: Rp80rb)`
+                            : `Pendaftar #${singleInfo.nextNumber} (#14+ tarif Rp80rb)`
+                        ) : isCouple ? (
+                          'Untuk 2 Peserta Sekaligus'
+                        ) : (
+                          'Untuk 3 Peserta Sekaligus'
+                        )}
                       </span>
                     </div>
                   </button>

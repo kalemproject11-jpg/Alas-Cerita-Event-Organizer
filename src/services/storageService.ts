@@ -3,6 +3,10 @@ import { INITIAL_USERS, INITIAL_EVENTS, INITIAL_TICKET_TYPES, INITIAL_BOOKINGS, 
 import { db, auth } from '../firebase';
 import { collection, doc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, runTransaction } from 'firebase/firestore';
 
+export const SINGLE_PROMO_LIMIT = 13;
+export const SINGLE_PROMO_PRICE = 70000;
+export const SINGLE_REGULAR_PRICE = 80000;
+
 const STORAGE_KEYS = {
   USERS: 'eventpass_users_v3',
   CURRENT_USER_ID: 'eventpass_current_user_id_v3',
@@ -277,13 +281,13 @@ class StorageService {
         id: 'tt_alas_single',
         eventId: 'evt_alas_cerita_2026',
         name: 'Single',
-        price: 80000,
+        price: SINGLE_PROMO_PRICE,
         quota: 120,
         availableQuota: 120,
         heldQuota: 0,
         saleStart: '2026-11-01T00:00:00Z',
         saleEnd: '2026-12-04T23:59:59Z',
-        description: 'Paket untuk 1 orang peserta. Semua paket mendapat fasilitas lengkap yang sama.',
+        description: 'Paket untuk 1 orang peserta. Pendaftar 1–13 seharga Rp70.000, pendaftar ke-14 ke atas seharga Rp80.000.',
         perks: ALAS_CERITA_PERKS,
       },
       {
@@ -374,7 +378,13 @@ class StorageService {
       const parsed: Event[] = data ? JSON.parse(data) : INITIAL_EVENTS;
       return parsed.map((evt) =>
         evt.id === 'evt_alas_cerita_2026'
-          ? { ...evt, posterUrl: '/assets/aistudio/WhatsApp_Image_2026-11-14_at_19.20.45_a24d6398.jpeg' }
+          ? {
+              ...evt,
+              title: evt.title?.includes('Rerasan Mawi Makna')
+                ? 'TALK SHOW • MINI WORKSHOP • KERONCONG MUSIC PERFORMANCE'
+                : evt.title,
+              posterUrl: '/assets/aistudio/WhatsApp_Image_2026-11-14_at_19.20.45_a24d6398.jpeg',
+            }
           : evt
       );
     } catch {
@@ -400,16 +410,85 @@ class StorageService {
     this.notify();
   }
 
+  // --- Single Tiered Pricing (1–13 = Rp 70.000, 14+ = Rp 80.000) ---
+  public getSinglePricingInfo(): {
+    registeredCount: number;
+    nextNumber: number;
+    promoLimit: number;
+    promoRemaining: number;
+    promoPrice: number;
+    regularPrice: number;
+    activePrice: number;
+    isPromoActive: boolean;
+  } {
+    const issuedTickets = this.getIssuedTickets();
+    const issuedSingleCount = issuedTickets.filter(
+      (t) => t.ticketTypeId === 'tt_alas_single' || t.packageName?.toLowerCase() === 'single'
+    ).length;
+
+    const nowMs = Date.now();
+    const bookings = this.getBookings();
+    const activePendingSingleQty = bookings
+      .filter(
+        (b) =>
+          b.ticketTypeId === 'tt_alas_single' &&
+          b.paymentStatus === 'pending' &&
+          new Date(b.expiresAt).getTime() > nowMs
+      )
+      .reduce((sum, b) => sum + (b.quantity || 1), 0);
+
+    const registeredCount = issuedSingleCount + activePendingSingleQty;
+    const nextNumber = registeredCount + 1;
+    const isPromoActive = registeredCount < SINGLE_PROMO_LIMIT;
+    const promoRemaining = Math.max(0, SINGLE_PROMO_LIMIT - registeredCount);
+    const activePrice = isPromoActive ? SINGLE_PROMO_PRICE : SINGLE_REGULAR_PRICE;
+
+    return {
+      registeredCount,
+      nextNumber,
+      promoLimit: SINGLE_PROMO_LIMIT,
+      promoRemaining,
+      promoPrice: SINGLE_PROMO_PRICE,
+      regularPrice: SINGLE_REGULAR_PRICE,
+      activePrice,
+      isPromoActive,
+    };
+  }
+
+  public calculateSingleTotal(quantity: number, startingCount = this.getSinglePricingInfo().registeredCount): number {
+    let total = 0;
+    for (let i = 0; i < quantity; i++) {
+      const registrantNumber = startingCount + 1 + i;
+      total += registrantNumber <= SINGLE_PROMO_LIMIT ? SINGLE_PROMO_PRICE : SINGLE_REGULAR_PRICE;
+    }
+    return total;
+  }
+
   // --- Ticket Types ---
   public getTicketTypes(eventId?: string): TicketType[] {
     try {
+      let all: TicketType[];
       if (this.ticketTypesCache) {
-        return eventId ? this.ticketTypesCache.filter((tt) => tt.eventId === eventId) : this.ticketTypesCache;
+        all = this.ticketTypesCache;
+      } else {
+        const data = localStorage.getItem(STORAGE_KEYS.TICKET_TYPES);
+        all = data ? JSON.parse(data) : INITIAL_TICKET_TYPES;
+        this.ticketTypesCache = all;
       }
-      const data = localStorage.getItem(STORAGE_KEYS.TICKET_TYPES);
-      const all: TicketType[] = data ? JSON.parse(data) : INITIAL_TICKET_TYPES;
-      this.ticketTypesCache = all;
-      return eventId ? all.filter((tt) => tt.eventId === eventId) : all;
+
+      const singlePrice = this.getSinglePricingInfo().activePrice;
+      const resolved = all.map((tt) =>
+        tt.id === 'tt_alas_single'
+          ? {
+              ...tt,
+              price: singlePrice,
+              description:
+                'Paket untuk 1 orang peserta. Pendaftar 1–13 seharga Rp70.000, pendaftar ke-14 ke atas seharga Rp80.000.',
+            }
+          : tt
+      );
+
+      return eventId ? resolved.filter((tt) => tt.eventId === eventId) : resolved;
     } catch {
       return INITIAL_TICKET_TYPES;
     }
@@ -524,6 +603,12 @@ class StorageService {
     this.ticketTypesCache = ticketTypes;
     safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, ticketTypes);
 
+    // Calculate booking total amount (with Single tiered pricing: #1–13 = Rp 70.000, #14+ = Rp 80.000)
+    const computedTotalAmount =
+      params.ticketTypeId === 'tt_alas_single'
+        ? this.calculateSingleTotal(params.quantity)
+        : targetTT.price * params.quantity;
+
     // 3. Generate booking with collision-proof ID and 30 minute expiration
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
@@ -539,7 +624,7 @@ class StorageService {
       customerPhone: params.customerPhone,
       eventId: params.eventId,
       invoiceCode,
-      totalAmount: targetTT.price * params.quantity,
+      totalAmount: computedTotalAmount,
       paymentStatus: 'pending',
       createdAt: now.toISOString(),
       expiresAt,
@@ -659,16 +744,33 @@ class StorageService {
 
       if (ticketType) {
         const ttRef = doc(db, 'ticketTypes', ticketType.id);
+        const isSingleTier = ticketType.id === 'tt_alas_single';
+        const projectedSingleCount =
+          this.getIssuedTickets().filter(
+            (t) => t.ticketTypeId === 'tt_alas_single' || t.packageName?.toLowerCase() === 'single'
+          ).length + (isSingleTier ? newIssued.length : 0);
+        const nextSinglePrice =
+          projectedSingleCount < SINGLE_PROMO_LIMIT ? SINGLE_PROMO_PRICE : SINGLE_REGULAR_PRICE;
+
         firestoreWrites.push(
           runTransaction(db, async (tx) => {
             const snap = await tx.get(ttRef);
             if (!snap.exists()) {
-              tx.set(ttRef, sanitizeForFirestore(ticketType));
+              tx.set(
+                ttRef,
+                sanitizeForFirestore(
+                  isSingleTier ? { ...ticketType, price: nextSinglePrice } : ticketType
+                )
+              );
               return;
             }
             const currentData = snap.data() as TicketType;
             const updatedAvailable = Math.max(0, (currentData.availableQuota ?? ticketType.quota) - booking.quantity);
-            tx.update(ttRef, { availableQuota: updatedAvailable });
+            if (isSingleTier) {
+              tx.update(ttRef, { availableQuota: updatedAvailable, price: nextSinglePrice });
+            } else {
+              tx.update(ttRef, { availableQuota: updatedAvailable });
+            }
           })
         );
       }
