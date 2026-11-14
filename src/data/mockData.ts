@@ -55,7 +55,7 @@ export const INITIAL_EVENTS: Event[] = [
     city: 'Yogyakarta',
     startTime: '2026-12-05T08:00:00Z',
     endTime: '2026-12-05T15:00:00Z',
-    posterUrl: '/assets/aistudio/alas-cerita-poster_fb646400.jpeg',
+    posterUrl: '/assets/aistudio/WhatsApp_Image_2026-11-14_at_19.20.45_a24d6398.jpeg',
     status: 'published',
     category: 'Arts',
     organizer: 'Alas Cerita Collective & Kalura',

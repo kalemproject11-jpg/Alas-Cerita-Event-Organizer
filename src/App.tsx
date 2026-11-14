@@ -105,12 +105,12 @@ export default function App() {
   const isAdminOrStaff = currentUser.role !== 'customer';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1c0f1c] via-[#261421] to-[#22170f] text-stone-100 flex flex-col font-sans selection:bg-pink-500/40 selection:text-pink-200 relative overflow-x-hidden">
-      {/* Ambient glow in pink & yellow */}
+    <div className="min-h-screen bg-gradient-to-br from-[#1b0e18] via-[#1b141c] to-[#0d2016] text-stone-100 flex flex-col font-sans selection:bg-pink-500/40 selection:text-pink-200 relative overflow-x-hidden">
+      {/* Ambient glow in pink & green matching logo */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
         <div className="absolute -top-32 -left-32 w-[460px] h-[460px] rounded-full bg-pink-500/15 blur-[120px]" />
-        <div className="absolute top-1/3 -right-32 w-[460px] h-[460px] rounded-full bg-amber-400/15 blur-[120px]" />
-        <div className="absolute -bottom-32 left-1/4 w-[520px] h-[520px] rounded-full bg-rose-500/12 blur-[130px]" />
+        <div className="absolute top-1/3 -right-32 w-[460px] h-[460px] rounded-full bg-emerald-500/15 blur-[120px]" />
+        <div className="absolute -bottom-32 left-1/4 w-[520px] h-[520px] rounded-full bg-pink-500/12 blur-[130px]" />
       </div>
 
       {/* Top Bar Header */}
@@ -192,7 +192,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setShowAdminAuthModal(true)}
-              className="px-6 py-3 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:brightness-110 text-stone-950 text-xs font-black rounded-xl transition-all shadow-md shadow-pink-500/25 cursor-pointer"
+              className="px-6 py-3 bg-pink-500 hover:bg-pink-400 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-pink-500/25 cursor-pointer"
             >
               Login Portal Admin
             </button>
@@ -246,12 +246,12 @@ export default function App() {
       )}
 
       {/* Quiet Footer */}
-      <footer className="border-t border-pink-900/30 bg-[#170b16]/90 py-6 sm:py-8 px-4 text-xs text-stone-400 mt-auto no-print backdrop-blur-md">
+      <footer className="border-t border-emerald-900/40 bg-[#150b14]/90 py-6 sm:py-8 px-4 text-xs text-stone-400 mt-auto no-print backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
           <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
             <span className="font-bold text-pink-300">Alas Cerita Event Organizer</span>
             <span aria-hidden="true">&middot;</span>
-            <span className="text-amber-300/90 font-medium">Sistem Pemesanan &amp; Validasi E-Ticket Resmi</span>
+            <span className="text-emerald-300/90 font-medium">Sistem Pemesanan &amp; Validasi E-Ticket Resmi</span>
           </div>
 
           <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 text-[11px] font-mono text-stone-400">
@@ -260,7 +260,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setShowAdminAuthModal(true)}
-              className="text-pink-300 hover:text-amber-300 transition-colors underline cursor-pointer"
+              className="text-pink-300 hover:text-emerald-300 transition-colors underline cursor-pointer"
             >
               Portal Admin
             </button>

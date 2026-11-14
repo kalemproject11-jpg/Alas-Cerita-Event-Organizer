@@ -157,7 +157,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         {/* Header bar */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-pink-500/25 bg-[#170a16] sticky top-0 z-20 gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-white p-0.5 border border-amber-300 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+            <div className="w-8 h-8 rounded-xl bg-white p-0.5 border border-emerald-400 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
               <img src="/alas-cerita-logo.jpg" alt="Alas Cerita" className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0">
@@ -184,7 +184,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <label className="text-xs font-bold text-stone-200 uppercase tracking-wider font-mono flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-gradient-to-r from-pink-500 to-amber-400 text-stone-950 flex items-center justify-center text-[11px] font-black">1</span>
+                <span className="w-5 h-5 rounded-full bg-pink-500 text-white flex items-center justify-center text-[11px] font-black">1</span>
                 <span>Pilih Paket Tiket:</span>
               </label>
               <span className="text-[11px] text-pink-300 font-mono">
@@ -208,10 +208,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between relative ${
                       isSelected
                         ? isCouple
-                          ? 'bg-gradient-to-b from-[#341d13] to-[#1c0e18] border-2 border-amber-400 shadow-xl shadow-amber-950/40 ring-1 ring-amber-400'
-                          : isCircle
-                          ? 'bg-gradient-to-b from-[#2e1429] to-[#1c0e18] border-2 border-pink-400 shadow-xl shadow-pink-950/40 ring-1 ring-pink-400'
-                          : 'bg-gradient-to-b from-[#2a1324] to-[#1c0e18] border-2 border-pink-400 shadow-xl ring-1 ring-pink-400'
+                          ? 'bg-[#10291c] border-2 border-emerald-400 shadow-xl shadow-emerald-950/40 ring-1 ring-emerald-400'
+                          : 'bg-[#2a1324] border-2 border-pink-400 shadow-xl shadow-pink-950/40 ring-1 ring-pink-400'
                         : 'bg-[#21101d]/80 border-pink-900/30 hover:border-pink-500/50'
                     }`}
                   >
@@ -220,7 +218,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                       <span className="text-sm font-black text-white flex items-center gap-1.5">
                         <span>{tier.name}</span>
                         {isSingle && <span className="w-2 h-2 rounded-full bg-pink-400" />}
-                        {isCouple && <span className="w-2 h-2 rounded-full bg-amber-400" />}
+                        {isCouple && <span className="w-2 h-2 rounded-full bg-emerald-400" />}
                         {isCircle && <span className="w-2 h-2 rounded-full bg-pink-300" />}
                       </span>
 
@@ -228,7 +226,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                         isSingle 
                           ? 'bg-pink-950 text-pink-300 border border-pink-800'
                           : isCouple 
-                          ? 'bg-amber-950 text-amber-300 border border-amber-700'
+                          ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
                           : 'bg-pink-950 text-pink-200 border border-pink-700'
                       }`}>
                         {capacity} Orang
@@ -236,7 +234,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     </div>
 
                     <div className="mt-1">
-                      <span className={`text-xl sm:text-2xl font-black font-mono tabular-nums ${isCouple ? 'text-[#FACC15]' : 'text-white'}`}>
+                      <span className={`text-xl sm:text-2xl font-black font-mono tabular-nums ${isCouple ? 'text-emerald-300' : 'text-white'}`}>
                         Rp{tier.price.toLocaleString('id-ID')}
                       </span>
                       <span className="text-[10px] text-stone-300 block mt-0.5">
@@ -253,10 +251,10 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           <div className="space-y-4 pt-2 border-t border-pink-500/20">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <label className="text-xs font-bold text-stone-200 uppercase tracking-wider font-mono flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-gradient-to-r from-pink-500 to-amber-400 text-stone-950 flex items-center justify-center text-[11px] font-black">2</span>
+                <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[11px] font-black">2</span>
                 <span>Biodata Peserta Hadir ({packageCapacity} Orang untuk {selectedTier?.name}):</span>
               </label>
-              <span className="text-[11px] text-[#FACC15] font-mono font-bold">
+              <span className="text-[11px] text-emerald-300 font-mono font-bold">
                 Setiap tiket diterbitkan per-nama peserta
               </span>
             </div>
@@ -277,7 +275,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                       </span>
                     </div>
 
-                    <span className="text-[10px] font-mono text-amber-300 bg-amber-950/60 px-2.5 py-0.5 rounded-full border border-amber-600/50 font-bold">
+                    <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-600/50 font-bold">
                       Tiket #{idx + 1} dari {packageCapacity}
                     </span>
                   </div>
@@ -368,7 +366,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           <div className="flex items-center justify-between sm:block">
             <span className="text-[11px] text-stone-300 block">Total Tagihan ({selectedTier?.name}):</span>
             <div className="flex items-baseline gap-2">
-              <span className="text-xl sm:text-2xl font-black text-[#FACC15] font-mono tabular-nums">
+              <span className="text-xl sm:text-2xl font-black text-emerald-300 font-mono tabular-nums">
                 Rp{totalPrice.toLocaleString('id-ID')}
               </span>
               <span className="text-[11px] font-mono text-pink-300 font-bold">
@@ -388,7 +386,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             <button
               type="button"
               onClick={handleProceed}
-              className="w-full sm:w-auto px-7 py-3.5 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:brightness-110 text-stone-950 text-xs font-black rounded-xl transition-all shadow-lg shadow-pink-500/30 flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
+              className="w-full sm:w-auto px-7 py-3.5 bg-pink-500 hover:bg-pink-400 text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-pink-500/30 flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
             >
               <span>Lanjut ke Pembayaran</span>
               <ArrowRight className="w-4 h-4 shrink-0" />

@@ -230,19 +230,19 @@ export const GateScanner: React.FC<GateScannerProps> = ({
             <span>MODUL VALIDASI PINTU MASUK (GATE CHECK-IN)</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-1">
-            Pemindai Kamera QR Code & Anti-Double Scan
+            Pemindai Kamera QR Code &amp; Anti-Double Scan
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Posko: <strong className="text-slate-200">{currentUser.staffGate || 'Gate A - Utama'}</strong> &middot; Petugas: <strong className="text-slate-200">{currentUser.name}</strong>
+          <p className="text-xs sm:text-sm text-stone-400 mt-1">
+            Posko: <strong className="text-stone-200">{currentUser.staffGate || 'Gate A - Utama'}</strong> &middot; Petugas: <strong className="text-stone-200">{currentUser.name}</strong>
           </p>
         </div>
 
         {/* Supervisor Helpdesk Shortcut */}
         <button
           onClick={onOpenSupervisorHelpdesk}
-          className="px-4 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-600/40 text-xs font-semibold rounded-xl transition-colors flex items-center gap-2 cursor-pointer shrink-0"
+          className="px-4 py-2 bg-pink-500/15 hover:bg-pink-500/25 text-pink-200 border border-pink-500/40 text-xs font-semibold rounded-xl transition-colors flex items-center gap-2 cursor-pointer shrink-0"
         >
-          <ShieldAlert className="w-4 h-4 text-amber-400" />
+          <ShieldAlert className="w-4 h-4 text-pink-400" />
           <span>Kendala Lapangan? Buka Helpdesk &rarr;</span>
         </button>
       </div>
@@ -252,7 +252,7 @@ export const GateScanner: React.FC<GateScannerProps> = ({
         
         {/* Left Column: Live Camera & Scanner (lg:col-span-7) */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="relative aspect-video sm:aspect-4/3 w-full bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex flex-col items-center justify-center">
+          <div className="relative aspect-video sm:aspect-4/3 w-full bg-[#150914] rounded-2xl border border-pink-500/25 overflow-hidden flex flex-col items-center justify-center">
             
             {/* Live Video Feed */}
             <video
@@ -280,19 +280,19 @@ export const GateScanner: React.FC<GateScannerProps> = ({
             {/* Camera Idle State */}
             {!cameraActive && (
               <div className="p-8 text-center space-y-4 max-w-sm">
-                <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 mx-auto">
+                <div className="w-16 h-16 rounded-2xl bg-[#221221] border border-pink-500/30 flex items-center justify-center text-pink-300 mx-auto">
                   <Camera className="w-8 h-8" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">Kamera Belum Aktif</h3>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-stone-400 mt-1">
                     Aktifkan kamera untuk memindai tiket pengunjung secara otomatis, atau gunakan simulasi scan cepat di bawah.
                   </p>
                 </div>
 
                 <button
                   onClick={startCamera}
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-colors shadow-lg shadow-emerald-600/30 inline-flex items-center gap-2 cursor-pointer"
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-emerald-600/30 inline-flex items-center gap-2 cursor-pointer"
                 >
                   <Camera className="w-4 h-4" />
                   <span>Aktifkan Kamera Pemindai</span>
@@ -308,7 +308,7 @@ export const GateScanner: React.FC<GateScannerProps> = ({
 
             {/* In-camera control bar */}
             {cameraActive && (
-              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between bg-slate-950/80 backdrop-blur-md p-2 px-4 rounded-xl border border-slate-800">
+              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between bg-[#150914]/85 backdrop-blur-md p-2 px-4 rounded-xl border border-pink-500/30">
                 <div className="flex items-center gap-2 text-xs text-emerald-400 font-mono">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span>MEMINDAI QR TIKET...</span>
@@ -325,12 +325,12 @@ export const GateScanner: React.FC<GateScannerProps> = ({
           </div>
 
           {/* Quick Test Barcode Buttons (Crucial for Evaluation & Testing) */}
-          <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-3">
+          <div className="p-4 bg-[#221221] border border-pink-500/25 rounded-2xl space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+              <span className="text-xs font-bold uppercase tracking-wider text-stone-200">
                 Uji Simulasi Scan Cepat (1-Klik)
               </span>
-              <span className="text-[11px] font-mono text-indigo-400">Target Latensi: &lt;500ms</span>
+              <span className="text-[11px] font-mono text-emerald-300">Target Latensi: &lt;500ms</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -339,13 +339,13 @@ export const GateScanner: React.FC<GateScannerProps> = ({
                   if (validTicketSample) executeValidation(validTicketSample.qrToken);
                 }}
                 disabled={!validTicketSample}
-                className="p-2.5 bg-emerald-950/60 hover:bg-emerald-950/90 border border-emerald-800/80 text-emerald-300 rounded-xl text-left transition-colors cursor-pointer disabled:opacity-40"
+                className="p-2.5 bg-emerald-950/60 hover:bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 rounded-xl text-left transition-colors cursor-pointer disabled:opacity-40"
               >
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span>1. Tiket Valid</span>
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                 </div>
-                <span className="text-[10px] text-slate-400 block mt-1 font-mono truncate">
+                <span className="text-[10px] text-stone-400 block mt-1 font-mono truncate">
                   {validTicketSample?.ticketNumber || 'Habis'} &middot; {validTicketSample?.attendeeName}
                 </span>
               </button>
@@ -361,20 +361,20 @@ export const GateScanner: React.FC<GateScannerProps> = ({
                   <span>2. Uji Scan Ganda</span>
                   <AlertOctagon className="w-3.5 h-3.5 text-rose-400" />
                 </div>
-                <span className="text-[10px] text-slate-400 block mt-1 font-mono truncate">
+                <span className="text-[10px] text-stone-400 block mt-1 font-mono truncate">
                   {checkedInSample?.ticketNumber || 'Belum ada'} (Pernah Scan)
                 </span>
               </button>
 
               <button
                 onClick={() => executeValidation('fake-uuid-9999-invalid-token-tampered')}
-                className="p-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 rounded-xl text-left transition-colors cursor-pointer"
+                className="p-2.5 bg-[#170a16] hover:bg-[#2a1328] border border-pink-500/30 text-pink-200 rounded-xl text-left transition-colors cursor-pointer"
               >
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span>3. QR Palsu</span>
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                  <AlertTriangle className="w-3.5 h-3.5 text-pink-400" />
                 </div>
-                <span className="text-[10px] text-slate-400 block mt-1 font-mono">
+                <span className="text-[10px] text-stone-400 block mt-1 font-mono">
                   Token Tidak Terdaftar
                 </span>
               </button>
@@ -382,8 +382,8 @@ export const GateScanner: React.FC<GateScannerProps> = ({
 
             {/* Upload QR File / Manual Token Input */}
             <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <label className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl text-xs text-slate-300 flex items-center justify-center gap-2 cursor-pointer transition-colors">
-                <Upload className="w-3.5 h-3.5 text-indigo-400" />
+              <label className="flex-1 px-3 py-2 bg-[#170a16] border border-pink-500/25 hover:border-emerald-400/50 rounded-xl text-xs text-stone-200 flex items-center justify-center gap-2 cursor-pointer transition-colors">
+                <Upload className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Unggah Foto / Screenshot QR</span>
                 <input
                   type="file"
@@ -399,7 +399,7 @@ export const GateScanner: React.FC<GateScannerProps> = ({
                   value={manualTokenInput}
                   onChange={(e) => setManualTokenInput(e.target.value)}
                   placeholder="Paste UUID qr_token..."
-                  className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-xl text-white font-mono placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 text-xs bg-[#170a16] border border-pink-500/30 rounded-xl text-white font-mono placeholder-stone-500 focus:outline-none focus:border-emerald-400"
                 />
                 <button
                   onClick={() => {
@@ -408,7 +408,7 @@ export const GateScanner: React.FC<GateScannerProps> = ({
                       setManualTokenInput('');
                     }
                   }}
-                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shrink-0 cursor-pointer"
+                  className="px-3.5 py-2 bg-pink-500 hover:bg-pink-400 text-white text-xs font-semibold rounded-xl shrink-0 cursor-pointer transition-colors"
                 >
                   Pindai
                 </button>
@@ -428,7 +428,7 @@ export const GateScanner: React.FC<GateScannerProps> = ({
                   ? 'bg-emerald-950/80 border-emerald-500/80 text-emerald-100 shadow-2xl shadow-emerald-950/50'
                   : scanResult.result === 'duplicate_scan'
                   ? 'bg-rose-950/90 border-rose-500/90 text-rose-100 shadow-2xl shadow-rose-950/50'
-                  : 'bg-amber-950/80 border-amber-500/80 text-amber-100'
+                  : 'bg-pink-950/80 border-pink-500/80 text-pink-100'
               }`}
             >
               {/* Giant Icon */}
@@ -442,7 +442,7 @@ export const GateScanner: React.FC<GateScannerProps> = ({
                     <AlertOctagon className="w-12 h-12" />
                   </div>
                 ) : (
-                  <div className="w-20 h-20 rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-amber-400">
+                  <div className="w-20 h-20 rounded-full bg-pink-500/20 border-2 border-pink-400 flex items-center justify-center text-pink-400">
                     <AlertTriangle className="w-12 h-12" />
                   </div>
                 )}
@@ -468,37 +468,37 @@ export const GateScanner: React.FC<GateScannerProps> = ({
 
               {/* Attendee Details Card */}
               {scanResult.ticket && (
-                <div className="p-4 bg-slate-950/70 rounded-xl border border-white/10 text-xs text-left space-y-2 font-mono">
-                  <div className="flex justify-between items-center text-slate-400">
+                <div className="p-4 bg-[#150914]/80 rounded-xl border border-white/10 text-xs text-left space-y-2 font-mono">
+                  <div className="flex justify-between items-center text-stone-400">
                     <span>Nama Pengunjung:</span>
                     <span className="text-white font-sans font-bold text-sm">
                       {scanResult.ticket.attendeeName}
                     </span>
                   </div>
                   {scanResult.ticket.packageName && (
-                    <div className="flex justify-between items-center text-amber-300">
+                    <div className="flex justify-between items-center text-emerald-300">
                       <span>Paket Bundle:</span>
-                      <span className="font-bold text-[11px] bg-amber-950/80 border border-amber-800/80 px-2 py-0.5 rounded">
+                      <span className="font-bold text-[11px] bg-emerald-950/80 border border-emerald-500/50 px-2 py-0.5 rounded">
                         Paket {scanResult.ticket.packageName} ({scanResult.ticket.packageMemberIndex || 1} dari {scanResult.ticket.packageTotalMembers || 1})
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between items-center text-slate-400">
+                  <div className="flex justify-between items-center text-stone-400">
                     <span>Kategori / Tier:</span>
-                    <span className="text-indigo-300 font-bold">
+                    <span className="text-pink-300 font-bold">
                       {scanResult.ticket.ticketTypeName}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-slate-400">
+                  <div className="flex justify-between items-center text-stone-400">
                     <span>ID Tiket Visual:</span>
                     <span className="text-white font-bold">{scanResult.ticket.ticketNumber}</span>
                   </div>
-                  <div className="flex justify-between items-center text-slate-400">
+                  <div className="flex justify-between items-center text-stone-400">
                     <span>Asal / Lembaga:</span>
-                    <span className="text-slate-200 font-semibold">{scanResult.ticket.attendeeOrigin || scanResult.ticket.attendeeNik || '-'}</span>
+                    <span className="text-stone-200 font-semibold">{scanResult.ticket.attendeeOrigin || scanResult.ticket.attendeeNik || '-'}</span>
                   </div>
                   {scanResult.ticket.seat_or_gate && (
-                    <div className="flex justify-between items-center text-slate-400">
+                    <div className="flex justify-between items-center text-stone-400">
                       <span>Akses Gate:</span>
                       <span className="text-emerald-400">{scanResult.ticket.seat_or_gate}</span>
                     </div>
@@ -530,13 +530,13 @@ export const GateScanner: React.FC<GateScannerProps> = ({
             </div>
           ) : (
             /* Standby State */
-            <div className="p-8 rounded-2xl bg-slate-900 border border-slate-800 text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-slate-800/80 text-slate-500 mx-auto flex items-center justify-center">
+            <div className="p-8 rounded-2xl bg-[#221221] border border-pink-500/25 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-[#170a16] border border-pink-500/25 text-pink-300 mx-auto flex items-center justify-center">
                 <Volume2 className="w-8 h-8" />
               </div>
               <div>
                 <h3 className="text-base font-bold text-white">Menunggu Pemindaian Tiket</h3>
-                <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                <p className="text-xs text-stone-400 mt-1 max-w-xs mx-auto">
                   Arahkan QR Code pengunjung ke kamera atau klik salah satu tombol uji cepat di sebelah kiri.
                 </p>
               </div>
@@ -544,33 +544,33 @@ export const GateScanner: React.FC<GateScannerProps> = ({
           )}
 
           {/* Gate Session Metrics */}
-          <div className="p-5 bg-slate-900 border border-slate-800 rounded-2xl space-y-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">
+          <div className="p-5 bg-[#221221] border border-pink-500/25 rounded-2xl space-y-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-stone-300 block">
               Statistik Sesi Pintu Masuk
             </span>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
-              <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800">
-                <span className="text-xs text-slate-400 block">Total Scan</span>
+              <div className="p-2.5 bg-[#170a16] rounded-xl border border-pink-500/20">
+                <span className="text-xs text-stone-400 block">Total Scan</span>
                 <span className="text-lg font-bold text-white font-mono tabular-nums">
                   {sessionStats.totalScanned}
                 </span>
               </div>
-              <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800">
+              <div className="p-2.5 bg-[#170a16] rounded-xl border border-emerald-500/25">
                 <span className="text-xs text-emerald-400 block">Lolos Sah</span>
                 <span className="text-lg font-bold text-emerald-400 font-mono tabular-nums">
                   {sessionStats.validPassed}
                 </span>
               </div>
-              <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800">
+              <div className="p-2.5 bg-[#170a16] rounded-xl border border-rose-500/25">
                 <span className="text-xs text-rose-400 block">Scan Ganda</span>
                 <span className="text-lg font-bold text-rose-400 font-mono tabular-nums">
                   {sessionStats.rejectedDouble}
                 </span>
               </div>
-              <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800">
-                <span className="text-xs text-amber-400 block">QR Palsu</span>
-                <span className="text-lg font-bold text-amber-400 font-mono tabular-nums">
+              <div className="p-2.5 bg-[#170a16] rounded-xl border border-pink-500/25">
+                <span className="text-xs text-pink-300 block">QR Palsu</span>
+                <span className="text-lg font-bold text-pink-300 font-mono tabular-nums">
                   {sessionStats.rejectedInvalid}
                 </span>
               </div>

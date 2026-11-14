@@ -203,11 +203,11 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
         {/* Payment Header */}
         <div className="px-5 sm:px-7 py-4 bg-[#241322] border-b border-pink-500/25 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white p-1 border-2 border-amber-300 shadow-sm flex items-center justify-center overflow-hidden shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-white p-1 border-2 border-emerald-400 shadow-sm flex items-center justify-center overflow-hidden shrink-0">
               <img src="/alas-cerita-logo.jpg" alt="Alas Cerita" className="w-full h-full object-contain" />
             </div>
             <div>
-              <span className="text-sm font-bold bg-gradient-to-r from-pink-300 via-rose-200 to-amber-200 bg-clip-text text-transparent block">Pembayaran E-Ticket Resmi</span>
+              <span className="text-sm font-bold bg-gradient-to-r from-pink-300 via-pink-200 to-emerald-300 bg-clip-text text-transparent block">Pembayaran E-Ticket Resmi</span>
               <span className="text-[11px] text-pink-300/80 font-mono">Invoice: {booking.invoiceCode}</span>
             </div>
           </div>
@@ -216,9 +216,9 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
           <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold ${
             isExpired
               ? 'bg-rose-950/80 text-rose-300 border-rose-800'
-              : 'bg-gradient-to-r from-pink-950/80 to-amber-950/80 text-[#FACC15] border-amber-400/50 shadow-sm'
+              : 'bg-gradient-to-r from-pink-950/80 to-emerald-950/80 text-emerald-300 border-emerald-400/50 shadow-sm'
           }`}>
-            <Clock className="w-3.5 h-3.5 text-amber-300" />
+            <Clock className="w-3.5 h-3.5 text-emerald-300" />
             <span>
               {isExpired ? 'Waktu Habis' : `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`}
             </span>
@@ -228,37 +228,37 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
         {paidSuccess ? (
           /* Payment Success & 24h Verification Pending Confirmation View (Bahasa Baku) */
           <div className="p-6 sm:p-9 text-center space-y-6 overflow-y-auto">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-500/20 to-amber-500/20 text-amber-300 border-2 border-amber-400/50 mx-auto flex items-center justify-center shadow-lg shadow-pink-500/20">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-500/20 to-emerald-500/20 text-emerald-300 border-2 border-emerald-400/50 mx-auto flex items-center justify-center shadow-lg shadow-pink-500/20">
               <Clock className="w-9 h-9" />
             </div>
 
             <div className="space-y-2">
-              <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-amber-300 bg-pink-950/80 border border-pink-500/40 px-3.5 py-1 rounded-full inline-block">
+              <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-emerald-300 bg-pink-950/80 border border-pink-500/40 px-3.5 py-1 rounded-full inline-block">
                 Bukti Pembayaran Berhasil Diterima
               </span>
               <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                 Terima Kasih, Pemesanan Anda Sedang Kami Proses
               </h3>
               <p className="text-stone-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
-                Terima kasih atas partisipasi Anda dalam acara <strong className="text-amber-300 font-bold">Alas Cerita</strong>. Bukti transfer dan biodata peserta Anda telah tersimpan dengan aman di sistem panitia.
+                Terima kasih atas partisipasi Anda dalam acara <strong className="text-emerald-300 font-bold">Alas Cerita</strong>. Bukti transfer dan biodata peserta Anda telah tersimpan dengan aman di sistem panitia.
               </p>
             </div>
 
             {/* Official Verification Notice Card (Bahasa Baku 1 x 24 Jam) */}
-            <div className="p-4 sm:p-5 bg-gradient-to-br from-[#2d1428] via-[#241421] to-[#2c2010] rounded-2xl border-2 border-amber-400/50 text-left space-y-2.5 max-w-lg mx-auto shadow-md">
-              <div className="flex items-center gap-2 text-amber-300 font-bold text-xs font-mono">
-                <ShieldCheck className="w-4 h-4 text-amber-300 shrink-0" />
+            <div className="p-4 sm:p-5 bg-gradient-to-br from-[#2b1224] via-[#1f131f] to-[#0f2419] rounded-2xl border-2 border-emerald-400/50 text-left space-y-2.5 max-w-lg mx-auto shadow-md">
+              <div className="flex items-center gap-2 text-emerald-300 font-bold text-xs font-mono">
+                <ShieldCheck className="w-4 h-4 text-emerald-300 shrink-0" />
                 <span>PEMBERITAHUAN VERIFIKASI RESMI (1 × 24 JAM)</span>
               </div>
               <p className="text-xs text-stone-200 leading-relaxed">
                 Pembayaran Anda saat ini sedang dalam <strong>tahap verifikasi administrasi</strong> oleh panitia pelaksana.
                 Dokumen resmi <strong>E-Ticket</strong> beserta kode QR akses masuk pintu acara akan dikirimkan ke alamat email terdaftar:
               </p>
-              <div className="p-2.5 bg-black/60 rounded-xl border border-pink-500/30 font-mono text-xs text-amber-300 font-bold flex items-center justify-between">
+              <div className="p-2.5 bg-black/60 rounded-xl border border-pink-500/30 font-mono text-xs text-emerald-300 font-bold flex items-center justify-between">
                 <span className="text-stone-300">Alamat Email Tujuan:</span>
-                <span className="text-amber-300">{booking.customerEmail}</span>
+                <span className="text-emerald-300">{booking.customerEmail}</span>
               </div>
-              <p className="text-[11px] text-amber-200/90 italic">
+              <p className="text-[11px] text-emerald-200/90 italic">
                 * Estimasi proses verifikasi dan pengiriman tiket digital adalah maksimal <strong>1 × 24 jam</strong> sejak bukti pembayaran diunggah.
               </p>
             </div>
@@ -283,7 +283,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
               </div>
               <div className="flex justify-between text-stone-300">
                 <span>Total Pembayaran:</span>
-                <span className="text-[#FACC15] font-black text-sm">Rp{booking.totalAmount.toLocaleString('id-ID')}</span>
+                <span className="text-emerald-300 font-black text-sm">Rp{booking.totalAmount.toLocaleString('id-ID')}</span>
               </div>
               <div className="flex justify-between text-stone-300">
                 <span>Metode Transfer:</span>
@@ -291,8 +291,8 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
               </div>
               <div className="flex justify-between text-stone-300 pt-2 border-t border-pink-900/40">
                 <span>Status Verifikasi:</span>
-                <span className="text-amber-300 font-bold flex items-center gap-1 font-mono">
-                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-emerald-300 font-bold flex items-center gap-1 font-mono">
+                  <Clock className="w-3.5 h-3.5 text-emerald-400" />
                   SEDANG DIVERIFIKASI PANITIA
                 </span>
               </div>
@@ -301,7 +301,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-lg mx-auto">
               <button
                 onClick={onPaymentSuccess}
-                className="w-full py-3.5 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 text-stone-950 text-xs font-black rounded-xl transition-all shadow-md shadow-pink-500/25 hover:brightness-110 inline-flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-600/25 inline-flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>Tutup &amp; Selesai</span>
               </button>
@@ -329,10 +329,10 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
           <div className="p-5 sm:p-7 space-y-6 overflow-y-auto flex-1">
             
             {/* Total Amount Banner */}
-            <div className="p-4 sm:p-5 bg-gradient-to-r from-[#2c1326] via-[#21141d] to-[#2c2010] rounded-2xl border-2 border-pink-500/30 flex items-center justify-between gap-4 shadow-md">
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-[#2c1326] via-[#1f141e] to-[#0f2419] rounded-2xl border-2 border-pink-500/30 flex items-center justify-between gap-4 shadow-md">
               <div>
                 <span className="text-xs text-pink-200/80 block">Total Tagihan Tiket:</span>
-                <span className="text-2xl sm:text-3xl font-black text-[#FACC15] font-mono tabular-nums">
+                <span className="text-2xl sm:text-3xl font-black text-emerald-300 font-mono tabular-nums">
                   Rp{booking.totalAmount.toLocaleString('id-ID')}
                 </span>
                 <span className="text-[11px] text-stone-300 block mt-0.5">
@@ -341,7 +341,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
               </div>
 
               <div className="hidden sm:block text-right">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 bg-pink-950/80 border border-pink-500/40 px-2.5 py-1 rounded-lg font-bold">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2.5 py-1 rounded-lg font-bold">
                   Resmi Alas Cerita
                 </span>
               </div>
@@ -360,13 +360,13 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                   onClick={() => setSelectedMethod('qris')}
                   className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 ${
                     selectedMethod === 'qris'
-                      ? 'bg-gradient-to-br from-pink-950/70 to-amber-950/70 border-2 border-amber-400 shadow-md shadow-pink-500/20'
+                      ? 'bg-[#10291c] border-2 border-emerald-400 shadow-md shadow-emerald-950/30'
                       : 'bg-[#211220]/80 border-pink-900/30 hover:border-pink-500/40'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <QrIcon className={`w-5 h-5 ${selectedMethod === 'qris' ? 'text-amber-300' : 'text-pink-300/70'}`} />
-                    <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-950/70 border border-amber-600/40 px-1.5 py-0.5 rounded">GPN</span>
+                    <QrIcon className={`w-5 h-5 ${selectedMethod === 'qris' ? 'text-emerald-300' : 'text-pink-300/70'}`} />
+                    <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/70 border border-emerald-600/40 px-1.5 py-0.5 rounded">GPN</span>
                   </div>
                   <div>
                     <span className="text-xs font-bold text-white block">1. QRIS</span>
@@ -380,7 +380,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                   onClick={() => setSelectedMethod('shopeepay')}
                   className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 ${
                     selectedMethod === 'shopeepay'
-                      ? 'bg-gradient-to-br from-pink-950/70 to-amber-950/70 border-2 border-amber-400 shadow-md shadow-pink-500/20'
+                      ? 'bg-[#2b1223] border-2 border-pink-400 shadow-md shadow-pink-950/30'
                       : 'bg-[#211220]/80 border-pink-900/30 hover:border-pink-500/40'
                   }`}
                 >
@@ -400,13 +400,13 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                   onClick={() => setSelectedMethod('bri')}
                   className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 ${
                     selectedMethod === 'bri'
-                      ? 'bg-gradient-to-br from-pink-950/70 to-amber-950/70 border-2 border-amber-400 shadow-md shadow-pink-500/20'
+                      ? 'bg-[#10291c] border-2 border-emerald-400 shadow-md shadow-emerald-950/30'
                       : 'bg-[#211220]/80 border-pink-900/30 hover:border-pink-500/40'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <Building2 className={`w-5 h-5 ${selectedMethod === 'bri' ? 'text-amber-300' : 'text-pink-300/70'}`} />
-                    <span className="text-[10px] font-mono font-bold text-blue-300 bg-blue-950/70 border border-blue-600/40 px-1.5 py-0.5 rounded">Bank BRI</span>
+                    <Building2 className={`w-5 h-5 ${selectedMethod === 'bri' ? 'text-emerald-300' : 'text-pink-300/70'}`} />
+                    <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/70 border border-emerald-600/40 px-1.5 py-0.5 rounded">Bank BRI</span>
                   </div>
                   <div>
                     <span className="text-xs font-bold text-white block">3. Bank BRI</span>
@@ -424,10 +424,10 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row items-center gap-6">
                     {/* QR Code Container */}
-                    <div className="relative p-2.5 bg-white rounded-2xl shadow-xl shrink-0 max-w-[210px] border-2 border-amber-300">
+                    <div className="relative p-2.5 bg-white rounded-2xl shadow-xl shrink-0 max-w-[210px] border-2 border-emerald-400">
                       <img
-                        src="/qris-payment.jpeg"
-                        alt="QRIS BLUESEAA - ART"
+                        src="/assets/aistudio/WhatsApp_Image_2026-11-14_at_19.20.45__1__cbbccacc.jpeg"
+                        alt="QRIS ALAS CERITA - ART"
                         className="w-full h-auto object-contain rounded-xl"
                       />
                     </div>
@@ -435,12 +435,12 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                     {/* QR Details & Instruction */}
                     <div className="space-y-3 text-xs flex-1">
                       <div>
-                        <span className="text-[10px] uppercase font-mono tracking-wider text-[#FACC15] block font-bold">
+                        <span className="text-[10px] uppercase font-mono tracking-wider text-emerald-300 block font-bold">
                           Merchant Resmi:
                         </span>
-                        <h4 className="text-base font-black text-white">BLUESEAA - ART</h4>
+                        <h4 className="text-base font-black text-white">ALAS CERITA - ART</h4>
                         <span className="text-xs font-mono text-stone-300 block mt-0.5">
-                          NMID: <strong className="text-amber-300">ID1026614898280</strong> (A01)
+                          NMID: <strong className="text-emerald-300">ID1026614898280</strong> (A01)
                         </span>
                       </div>
 
@@ -449,17 +449,17 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                         <ol className="list-decimal list-inside space-y-1 text-[11px] text-stone-300">
                           <li>Buka m-Banking (BCA, BRImo, Mandiri, BNI, dll) atau E-Wallet (GoPay, ShopeePay, OVO, DANA).</li>
                           <li>Pilih menu <strong>Scan / Bayar QRIS</strong>.</li>
-                          <li>Scan kode QR di samping dan masukkan nominal tagihan <strong className="text-amber-300">Rp{booking.totalAmount.toLocaleString('id-ID')}</strong>.</li>
+                          <li>Scan kode QR di samping dan masukkan nominal tagihan <strong className="text-emerald-300">Rp{booking.totalAmount.toLocaleString('id-ID')}</strong>.</li>
                           <li>Setelah berhasil, simpan screenshot / struk dan upload di bawah.</li>
                         </ol>
                       </div>
 
                       <a
-                        href="/qris-payment.jpeg"
-                        download="QRIS-AlasCerita-BLUESEAA.jpeg"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500/20 to-amber-500/20 hover:from-pink-500/30 hover:to-amber-500/30 border border-pink-500/40 text-pink-200 hover:text-white rounded-xl text-xs font-semibold transition-colors"
+                        href="/assets/aistudio/WhatsApp_Image_2026-11-14_at_19.20.45__1__cbbccacc.jpeg"
+                        download="QRIS-ALAS-CERITA-ART.jpeg"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-colors shadow-sm shadow-emerald-600/25"
                       >
-                        <Download className="w-3.5 h-3.5 text-amber-300" />
+                        <Download className="w-3.5 h-3.5" />
                         <span>Unduh Barcode QRIS</span>
                       </a>
                     </div>
@@ -481,7 +481,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                   <div className="p-4 bg-[#1a0e1a] rounded-2xl border border-pink-500/30 flex items-center justify-between gap-3">
                     <div>
                       <span className="text-[10px] text-stone-400 block font-mono">Nomor Akun ShopeePay:</span>
-                      <span className="text-xl sm:text-2xl font-mono font-bold text-amber-300 tracking-wider">
+                      <span className="text-xl sm:text-2xl font-mono font-bold text-emerald-300 tracking-wider">
                         085747358169
                       </span>
                     </div>
@@ -489,7 +489,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleCopy('085747358169', 'shopee')}
-                      className="px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 hover:brightness-110 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-md shadow-pink-500/25"
+                      className="px-4 py-2 bg-pink-500 hover:bg-pink-400 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-md shadow-pink-500/25"
                     >
                       {copiedText === 'shopee' ? (
                         <>
@@ -510,8 +510,8 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                     <ol className="list-decimal list-inside space-y-1 text-stone-300">
                       <li>Buka aplikasi <strong>Shopee</strong> &gt; menu <strong>ShopeePay</strong>.</li>
                       <li>Pilih menu <strong>Transfer</strong> &gt; <strong>Kirim ke Kontak / No. HP</strong>.</li>
-                      <li>Masukkan Nomor: <strong className="text-amber-300">085747358169</strong>.</li>
-                      <li>Transfer nominal pas: <strong className="text-amber-300">Rp{booking.totalAmount.toLocaleString('id-ID')}</strong>.</li>
+                      <li>Masukkan Nomor: <strong className="text-emerald-300">085747358169</strong>.</li>
+                      <li>Transfer nominal pas: <strong className="text-emerald-300">Rp{booking.totalAmount.toLocaleString('id-ID')}</strong>.</li>
                     </ol>
                   </div>
                 </div>
@@ -521,7 +521,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
               {selectedMethod === 'bri' && (
                 <div className="space-y-4 text-xs">
                   <div>
-                    <span className="text-[10px] uppercase font-mono tracking-wider text-amber-300 block font-bold">
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-emerald-300 block font-bold">
                       Rekening Resmi Bank BRI:
                     </span>
                     <h4 className="text-lg font-black text-white mt-0.5">Bank Rakyat Indonesia (BRI)</h4>
@@ -531,18 +531,18 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                   <div className="p-4 bg-[#1a0e1a] rounded-2xl border border-pink-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <span className="text-[10px] text-stone-400 block font-mono">Nomor Rekening BRI:</span>
-                      <span className="text-xl sm:text-2xl font-mono font-bold text-amber-300 tracking-wider block">
+                      <span className="text-xl sm:text-2xl font-mono font-bold text-emerald-300 tracking-wider block">
                         306601019331502
                       </span>
                       <span className="text-xs text-stone-300 font-semibold mt-0.5 block">
-                        Atas Nama: <strong className="text-[#FACC15]">ARIQOH NUR AFISYAH</strong>
+                        Atas Nama: <strong className="text-emerald-300">ARIQOH NUR AFISYAH</strong>
                       </span>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => handleCopy('306601019331502', 'bri')}
-                      className="px-4 py-2 bg-gradient-to-r from-amber-400 to-yellow-500 hover:brightness-110 text-stone-950 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-md shadow-amber-500/25"
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-md shadow-emerald-600/25"
                     >
                       {copiedText === 'bri' ? (
                         <>
@@ -562,9 +562,9 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                     <span className="font-semibold text-pink-200 block">Petunjuk Transfer BRI:</span>
                     <ol className="list-decimal list-inside space-y-1 text-stone-300">
                       <li>Buka <strong>BRImo</strong> atau transfer ATM BRI.</li>
-                      <li>Masukkan Nomor Rekening: <strong className="text-amber-300">306601019331502</strong>.</li>
-                      <li>Pastikan nama tujuan transfer: <strong className="text-[#FACC15]">ARIQOH NUR AFISYAH</strong>.</li>
-                      <li>Transfer nominal tepat: <strong className="text-amber-300">Rp{booking.totalAmount.toLocaleString('id-ID')}</strong>.</li>
+                      <li>Masukkan Nomor Rekening: <strong className="text-emerald-300">306601019331502</strong>.</li>
+                      <li>Pastikan nama tujuan transfer: <strong className="text-emerald-300">ARIQOH NUR AFISYAH</strong>.</li>
+                      <li>Transfer nominal tepat: <strong className="text-emerald-300">Rp{booking.totalAmount.toLocaleString('id-ID')}</strong>.</li>
                     </ol>
                   </div>
                 </div>
@@ -572,7 +572,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
             </div>
 
             {/* KOLOM UPLOAD BUKTI TRANSFER (WAJIB UNTUK VERIFIKASI ADMIN) */}
-            <div className="p-5 bg-gradient-to-br from-[#271324]/90 via-[#20111e] to-[#2c2010]/80 border-2 border-dashed border-pink-400/50 rounded-3xl space-y-4 text-xs shadow-md">
+            <div className="p-5 bg-gradient-to-br from-[#271324]/90 via-[#1d121d] to-[#0f2419]/80 border-2 border-dashed border-pink-400/50 rounded-3xl space-y-4 text-xs shadow-md">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-pink-500/20 border border-pink-500/40 flex items-center justify-center text-pink-300">
@@ -587,7 +587,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                     </span>
                   </div>
                 </div>
-                <span className="text-[10px] font-mono text-amber-300 bg-pink-950/80 border border-pink-500/40 px-2.5 py-0.5 rounded font-bold uppercase">
+                <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2.5 py-0.5 rounded font-bold uppercase">
                   Syarat Tiket
                 </span>
               </div>
@@ -618,7 +618,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
 
                 {proofImage ? (
                   /* Uploaded preview box */
-                  <div className="p-3.5 bg-[#170a16] rounded-2xl border-2 border-amber-400/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="p-3.5 bg-[#170a16] rounded-2xl border-2 border-emerald-400/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3 overflow-hidden">
                       <div
                         onClick={() => setShowPreviewModal(true)}
@@ -631,8 +631,8 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                         </div>
                       </div>
                       <div className="space-y-0.5 min-w-0">
-                        <div className="flex items-center gap-1.5 text-amber-300 font-bold text-xs">
-                          <CheckCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                        <div className="flex items-center gap-1.5 text-emerald-300 font-bold text-xs">
+                          <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
                           <span>Foto Bukti Siap Dikirim</span>
                         </div>
                         <span className="text-[11px] text-stone-400 block truncate">
@@ -664,7 +664,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                     htmlFor="proof-upload-input"
                     className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-pink-500/35 hover:border-pink-400 rounded-2xl bg-[#1b0d1a]/80 hover:bg-[#251224]/80 cursor-pointer transition-all space-y-2 group"
                   >
-                    <div className="w-12 h-12 rounded-2xl bg-[#291325] group-hover:bg-pink-500/20 border border-pink-500/30 group-hover:border-pink-400 flex items-center justify-center text-pink-300 group-hover:text-amber-300 transition-colors">
+                    <div className="w-12 h-12 rounded-2xl bg-[#291325] group-hover:bg-pink-500/20 border border-pink-500/30 group-hover:border-pink-400 flex items-center justify-center text-pink-300 group-hover:text-emerald-300 transition-colors">
                       <Upload className="w-5 h-5" />
                     </div>
                     <div className="text-center">
@@ -693,7 +693,7 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
                 type="button"
                 onClick={handleConfirmPayment}
                 disabled={isProcessing || isCompressingImage}
-                className="w-full py-4 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:brightness-110 disabled:opacity-60 text-stone-950 font-black rounded-2xl transition-all shadow-lg shadow-pink-500/25 flex items-center justify-center gap-2 cursor-pointer text-sm"
+                className="w-full py-4 bg-pink-500 hover:bg-pink-400 disabled:opacity-60 text-white font-black rounded-2xl transition-all shadow-lg shadow-pink-500/25 flex items-center justify-center gap-2 cursor-pointer text-sm"
               >
                 {isCompressingImage ? (
                   <span className="animate-pulse">Mengoptimalkan Foto Bukti Bayar...</span>

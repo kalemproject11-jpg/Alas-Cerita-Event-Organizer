@@ -98,20 +98,20 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
   return (
     <div className="space-y-6 pb-20">
       {/* Top Control Header */}
-      <section className="p-5 sm:p-6 bg-gradient-to-br from-[#2c1326] via-[#21141c] to-[#2c2010] border border-pink-500/35 rounded-3xl shadow-xl space-y-5">
+      <section className="p-5 sm:p-6 bg-gradient-to-br from-[#2c1326] via-[#21141c] to-[#0e2218] border border-pink-500/35 rounded-3xl shadow-xl space-y-5">
         {/* Row 1: Title & Admin Database Actions */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white p-1 shrink-0 overflow-hidden shadow-md border-2 border-amber-300">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white p-1 shrink-0 overflow-hidden shadow-md border-2 border-emerald-400">
               <img src="/alas-cerita-logo.jpg" alt="Alas Cerita" className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-mono text-pink-200">
-                <span className="font-bold uppercase tracking-wider text-amber-300">Portal Admin &amp; Gate</span>
+                <span className="font-bold uppercase tracking-wider text-emerald-300">Portal Admin &amp; Gate</span>
                 <span aria-hidden="true">&middot;</span>
                 <span className="text-stone-300 truncate">{currentUser.name}</span>
               </div>
-              <h1 className="text-lg sm:text-2xl font-black bg-gradient-to-r from-pink-300 via-rose-200 to-amber-200 bg-clip-text text-transparent mt-0.5 leading-snug">
+              <h1 className="text-lg sm:text-2xl font-black bg-gradient-to-r from-pink-300 via-pink-200 to-emerald-300 bg-clip-text text-transparent mt-0.5 leading-snug">
                 Dashboard Validasi Gate &amp; Verifikasi Pembayaran
               </h1>
               <p className="text-xs text-stone-300 mt-0.5 line-clamp-2">
@@ -125,10 +125,10 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
             <button
               type="button"
               onClick={() => setShowResetModal(true)}
-              className="px-3.5 py-2.5 bg-[#251323] hover:bg-[#341a32] text-amber-200 border border-amber-400/40 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap min-h-[40px]"
+              className="px-3.5 py-2.5 bg-[#0e2218] hover:bg-[#163324] text-emerald-200 border border-emerald-400/40 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap min-h-[40px]"
               title="Kembalikan seluruh database ke data contoh awal"
             >
-              <RotateCcw className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <RotateCcw className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
               <span>Reset Data Awal</span>
             </button>
 
@@ -164,7 +164,7 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
 
           <div className="p-3.5 bg-[#1b0e1a]/85 border border-pink-500/25 rounded-2xl">
             <span className="text-[11px] font-mono text-pink-200/75 block">Kehadiran Gate</span>
-            <span className="text-base sm:text-lg font-black font-mono text-amber-300 tabular-nums mt-0.5 block">
+            <span className="text-base sm:text-lg font-black font-mono text-emerald-300 tabular-nums mt-0.5 block">
               {totalCheckedIn} / {totalSold} Masuk
             </span>
           </div>
@@ -176,9 +176,9 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
             </span>
           </div>
 
-          <div className="p-3.5 bg-[#1b0e1a]/85 border border-amber-400/30 rounded-2xl">
-            <span className="text-[11px] font-mono text-amber-200/80 block">Total Omset</span>
-            <span className="text-base sm:text-lg font-black font-mono text-[#FACC15] tabular-nums mt-0.5 block truncate">
+          <div className="p-3.5 bg-[#1b0e1a]/85 border border-emerald-400/35 rounded-2xl">
+            <span className="text-[11px] font-mono text-emerald-200/80 block">Total Omset</span>
+            <span className="text-base sm:text-lg font-black font-mono text-emerald-300 tabular-nums mt-0.5 block truncate">
               Rp {totalRevenue.toLocaleString('id-ID')}
             </span>
           </div>
@@ -187,9 +187,9 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
 
       {/* Feedback Banner for Reset / Clear */}
       {dbFeedback && (
-        <div className="p-3.5 bg-gradient-to-r from-pink-950/90 to-amber-950/90 border border-amber-400/50 rounded-2xl text-amber-200 text-xs flex items-center justify-between gap-3 shadow-lg">
+        <div className="p-3.5 bg-gradient-to-r from-pink-950/90 to-emerald-950/90 border border-emerald-400/50 rounded-2xl text-emerald-200 text-xs flex items-center justify-between gap-3 shadow-lg">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{dbFeedback}</span>
           </div>
           <button
@@ -211,14 +211,14 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
             onClick={() => setActiveSubTab('payments')}
             className={`flex items-center justify-center sm:justify-start gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer min-h-[42px] ${
               activeSubTab === 'payments'
-                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md shadow-pink-500/25'
+                ? 'bg-pink-500 text-white shadow-md shadow-pink-500/25'
                 : 'text-stone-300 hover:text-white hover:bg-pink-950/40'
             }`}
           >
             <Receipt className="w-4 h-4 shrink-0" />
             <span className="truncate">Verifikasi ({bookings.length})</span>
             {totalWithProof > 0 && (
-              <span className="hidden md:inline text-[10px] font-mono px-1.5 py-0.5 bg-amber-400 text-stone-950 font-bold rounded">
+              <span className="hidden md:inline text-[10px] font-mono px-1.5 py-0.5 bg-emerald-400 text-stone-950 font-bold rounded">
                 {totalWithProof} Struk
               </span>
             )}
@@ -229,7 +229,7 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
             onClick={() => setActiveSubTab('scanner')}
             className={`flex items-center justify-center sm:justify-start gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer min-h-[42px] ${
               activeSubTab === 'scanner'
-                ? 'bg-gradient-to-r from-amber-400 to-yellow-400 text-stone-950 font-black shadow-md shadow-amber-500/25'
+                ? 'bg-emerald-600 text-white font-black shadow-md shadow-emerald-600/25'
                 : 'text-stone-300 hover:text-white hover:bg-pink-950/40'
             }`}
           >
@@ -242,7 +242,7 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
             onClick={() => setActiveSubTab('tickets')}
             className={`flex items-center justify-center sm:justify-start gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer min-h-[42px] ${
               activeSubTab === 'tickets'
-                ? 'bg-gradient-to-r from-pink-600 to-pink-500 text-white shadow-md shadow-pink-600/25'
+                ? 'bg-pink-500 text-white shadow-md shadow-pink-500/25'
                 : 'text-stone-300 hover:text-white hover:bg-pink-950/40'
             }`}
           >
@@ -255,7 +255,7 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
             onClick={() => setActiveSubTab('helpdesk')}
             className={`flex items-center justify-center sm:justify-start gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer min-h-[42px] ${
               activeSubTab === 'helpdesk'
-                ? 'bg-[#FACC15] text-stone-950 shadow-md shadow-amber-500/25 font-extrabold'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25 font-extrabold'
                 : 'text-stone-300 hover:text-white hover:bg-pink-950/40'
             }`}
           >
@@ -281,7 +281,7 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
             onClick={() => setActiveSubTab('logs')}
             className={`flex items-center justify-center sm:justify-start gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer min-h-[42px] ${
               activeSubTab === 'logs'
-                ? 'bg-amber-950 text-amber-200 border border-amber-500/40 shadow-md font-bold'
+                ? 'bg-emerald-950 text-emerald-200 border border-emerald-500/40 shadow-md font-bold'
                 : 'text-stone-300 hover:text-white hover:bg-pink-950/40'
             }`}
           >
@@ -354,13 +354,13 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
       {/* Modal: Konfirmasi Reset Database ke Data Awal */}
       {showResetModal && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="w-full max-w-md bg-[#1c0f1c] border-2 border-amber-400/50 rounded-3xl p-6 shadow-2xl space-y-4 text-left">
-            <div className="w-12 h-12 rounded-2xl bg-amber-950/80 border border-amber-500/60 flex items-center justify-center text-amber-300">
+          <div className="w-full max-w-md bg-[#1c0f1c] border-2 border-emerald-400/50 rounded-3xl p-6 shadow-2xl space-y-4 text-left">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-950/80 border border-emerald-500/60 flex items-center justify-center text-emerald-300">
               <RotateCcw className="w-6 h-6" />
             </div>
 
             <div className="space-y-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-300 block">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-emerald-300 block">
                 PENGEMBALIAN DATA CONTOH
               </span>
               <h3 className="text-lg font-black text-white">
@@ -384,7 +384,7 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
                 type="button"
                 onClick={handleConfirmResetInitial}
                 disabled={isProcessingDb}
-                className="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-yellow-400 hover:brightness-110 text-stone-950 text-xs font-black rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-600/25 flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>{isProcessingDb ? 'Mereset Database...' : 'Ya, Reset ke Data Awal'}</span>
@@ -427,7 +427,7 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
                 type="button"
                 onClick={handleConfirmClearSimulation}
                 disabled={isProcessingDb}
-                className="px-5 py-2.5 bg-gradient-to-r from-rose-600 to-rose-700 hover:brightness-110 text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{isProcessingDb ? 'Membersihkan...' : 'Ya, Hapus Semua Simulasi'}</span>

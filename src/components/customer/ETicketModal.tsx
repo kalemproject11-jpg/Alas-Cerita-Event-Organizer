@@ -41,7 +41,7 @@ export const ETicketModal: React.FC<ETicketModalProps> = ({ ticket, event, onClo
         {/* Header utility bar (hidden in print) */}
         <div className="px-4 sm:px-6 py-3.5 bg-[#241322] border-b border-pink-500/25 flex items-center justify-between no-print gap-2 flex-wrap shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <ShieldCheck className="w-4 h-4 text-amber-300 shrink-0" />
+            <ShieldCheck className="w-4 h-4 text-emerald-300 shrink-0" />
             <span className="text-[11px] sm:text-xs font-mono font-medium text-pink-200 truncate">
               OFFICIAL E-TICKET PASS
             </span>
@@ -50,7 +50,7 @@ export const ETicketModal: React.FC<ETicketModalProps> = ({ ticket, event, onClo
             <button
               type="button"
               onClick={() => downloadTicketAsPNG(ticket, event)}
-              className="px-3 py-2 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 text-stone-950 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-pink-500/25 hover:brightness-110"
+              className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/25"
               title="Unduh E-Ticket sebagai file gambar PNG resmi untuk dikirimkan ke peserta"
             >
               <Download className="w-3.5 h-3.5 shrink-0" />
@@ -62,7 +62,7 @@ export const ETicketModal: React.FC<ETicketModalProps> = ({ ticket, event, onClo
               onClick={handlePrint}
               className="px-3 py-2 bg-[#2d1428] hover:bg-[#3a1a34] text-pink-200 border border-pink-500/30 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <Printer className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <Printer className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
               <span className="hidden sm:inline">Cetak / PDF</span>
               <span className="sm:hidden">Cetak</span>
             </button>
@@ -81,23 +81,23 @@ export const ETicketModal: React.FC<ETicketModalProps> = ({ ticket, event, onClo
         <div className="p-4 sm:p-6 lg:p-8 space-y-6 bg-[#1c0f1c] text-white overflow-y-auto flex-1">
           {/* Ticket Header & Status */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-pink-900/30">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-[#FACC15] block">
+            <div className="min-w-0 flex-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-300 block">
                 {event.category} FESTIVAL PASS
               </span>
-              <h2 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-pink-300 via-rose-200 to-amber-200 bg-clip-text text-transparent mt-0.5">{event.title}</h2>
-              <p className="text-xs text-pink-300/70 mt-1">{event.organizer}</p>
+              <h2 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-pink-300 via-pink-200 to-emerald-300 bg-clip-text text-transparent mt-0.5 break-words">{event.title}</h2>
+              <p className="text-xs text-pink-300/70 mt-1 break-words">{event.organizer}</p>
             </div>
 
             {/* Check-in status pill/badge */}
             <div className="shrink-0">
               {isCheckedIn ? (
-                <div className="p-2.5 px-3 bg-amber-950/80 border border-amber-500/60 rounded-xl text-left">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
-                    <CheckCircle2 className="w-4 h-4 text-amber-400" />
+                <div className="p-2.5 px-3 bg-emerald-950/80 border border-emerald-500/60 rounded-xl text-left">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                     <span>SUDAH CHECK-IN</span>
                   </div>
-                  <span className="text-[10px] text-amber-300/80 font-mono block mt-0.5">
+                  <span className="text-[10px] text-emerald-300/80 font-mono block mt-0.5">
                     {new Date(ticket.checkedInAt || '').toLocaleTimeString('id-ID')} WIB
                   </span>
                 </div>
@@ -107,7 +107,7 @@ export const ETicketModal: React.FC<ETicketModalProps> = ({ ticket, event, onClo
                     <CheckCircle2 className="w-4 h-4 text-pink-400" />
                     <span>TIKET SAH & AKTIF</span>
                   </div>
-                  <span className="text-[10px] text-amber-300 block mt-0.5 font-medium">
+                  <span className="text-[10px] text-emerald-300 block mt-0.5 font-medium">
                     Tunjukkan QR di Pintu Masuk
                   </span>
                 </div>
@@ -119,7 +119,7 @@ export const ETicketModal: React.FC<ETicketModalProps> = ({ ticket, event, onClo
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
             
             {/* Left QR Box */}
-            <div className="sm:col-span-5 flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-xl text-slate-950 border-2 border-amber-300">
+            <div className="sm:col-span-5 flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-xl text-slate-950 border-2 border-emerald-400">
               {qrDataUrl ? (
                 <img src={qrDataUrl} alt="E-Ticket QR Code" className="w-44 h-44 object-contain" />
               ) : (
@@ -138,39 +138,39 @@ export const ETicketModal: React.FC<ETicketModalProps> = ({ ticket, event, onClo
             {/* Right Information Details */}
             <div className="sm:col-span-7 space-y-3.5 min-w-0">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3 bg-[#231221] rounded-xl border border-pink-500/25">
+                <div className="p-3 bg-[#231221] rounded-xl border border-pink-500/25 min-w-0">
                   <span className="text-[10px] uppercase font-semibold text-pink-300/70 block">Kategori Tiket</span>
-                  <span className="text-sm font-bold text-[#FACC15]">{ticket.ticketTypeName}</span>
+                  <span className="text-sm font-bold text-emerald-300 break-words block">{ticket.ticketTypeName}</span>
                 </div>
-                <div className="p-3 bg-[#231221] rounded-xl border border-pink-500/25">
+                <div className="p-3 bg-[#231221] rounded-xl border border-pink-500/25 min-w-0">
                   <span className="text-[10px] uppercase font-semibold text-pink-300/70 block">Pintu / Gate Masuk</span>
-                  <span className="text-xs sm:text-sm font-bold text-white break-words">{ticket.seat_or_gate || 'Gate Utama'}</span>
+                  <span className="text-xs sm:text-sm font-bold text-white break-words block">{ticket.seat_or_gate || 'Gate Utama'}</span>
                 </div>
               </div>
 
-              <div className="p-3.5 bg-[#231221] rounded-xl border border-pink-500/25 space-y-2">
+              <div className="p-3.5 bg-[#231221] rounded-xl border border-pink-500/25 space-y-2 min-w-0">
                 <div className="flex flex-wrap items-center justify-between gap-1">
-                  <span className="text-[10px] uppercase font-semibold text-pink-300/70">Nama Pengunjung</span>
-                  <span className="text-[10px] font-mono text-amber-300 font-bold">
+                  <span className="text-[10px] uppercase font-semibold text-pink-300/70 shrink-0">Nama Pengunjung</span>
+                  <span className="text-[10px] font-mono text-emerald-300 font-bold break-words">
                     Asal/Lembaga: {ticket.attendeeOrigin || ticket.attendeeNik || '-'}
                   </span>
                 </div>
-                <span className="text-sm font-bold text-white block">{ticket.attendeeName}</span>
+                <span className="text-sm font-bold text-white block break-words">{ticket.attendeeName}</span>
                 <span className="text-xs text-stone-300 block break-all">{ticket.attendeeEmail} &middot; {ticket.attendeePhone}</span>
                 {ticket.packageName && (
                   <div className="pt-2 border-t border-pink-900/30 flex flex-wrap items-center justify-between gap-2 text-[11px]">
                     <span className="text-pink-200/80">Bagian dari Paket:</span>
-                    <span className="font-mono font-bold text-stone-950 bg-gradient-to-r from-amber-400 to-yellow-400 px-2 py-0.5 rounded">
+                    <span className="font-mono font-bold text-white bg-emerald-600 px-2 py-0.5 rounded">
                       Paket {ticket.packageName} &middot; {ticket.packageMemberIndex || 1}/{ticket.packageTotalMembers || 1}
                     </span>
                   </div>
                 )}
               </div>
 
-              <div className="space-y-1.5 text-xs text-stone-200">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-3.5 h-3.5 text-pink-400 shrink-0" />
-                  <span>
+              <div className="space-y-1.5 text-xs text-stone-200 min-w-0">
+                <div className="flex items-start gap-2">
+                  <Calendar className="w-3.5 h-3.5 text-pink-400 shrink-0 mt-0.5" />
+                  <span className="break-words min-w-0">
                     {new Date(event.startTime).toLocaleDateString('id-ID', {
                       weekday: 'long',
                       day: 'numeric',
@@ -182,9 +182,9 @@ export const ETicketModal: React.FC<ETicketModalProps> = ({ ticket, event, onClo
                     WIB
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span>{event.venue}, {event.city}</span>
+                <div className="flex items-start gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                  <span className="break-words min-w-0">{event.venue}, {event.city}</span>
                 </div>
               </div>
             </div>
@@ -192,8 +192,8 @@ export const ETicketModal: React.FC<ETicketModalProps> = ({ ticket, event, onClo
 
           {/* Security & Entry Rules */}
           <div className="p-4 bg-[#231221]/80 rounded-2xl border border-pink-500/25 text-[11px] text-pink-200/80 space-y-2">
-            <div className="flex items-center gap-2 text-amber-300 font-bold">
-              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+            <div className="flex items-center gap-2 text-emerald-300 font-bold">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
               <span>Ketentuan Validasi Pintu Masuk (Anti-Double Scan)</span>
             </div>
             <p>

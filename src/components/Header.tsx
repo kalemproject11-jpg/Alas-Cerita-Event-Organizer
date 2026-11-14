@@ -32,7 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => onSelectTab('catalog')}
           className="flex items-center gap-2 sm:gap-3 shrink-0 text-left group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 rounded-xl"
         >
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white p-1 shadow-md shadow-pink-500/20 flex items-center justify-center overflow-hidden border border-amber-300 shrink-0">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white p-1 shadow-md shadow-pink-500/20 flex items-center justify-center overflow-hidden border border-emerald-400 shrink-0">
             <img
               src="/alas-cerita-logo.jpg"
               alt="Logo Alas Cerita"
@@ -40,10 +40,10 @@ export const Header: React.FC<HeaderProps> = ({
             />
           </div>
           <div className="flex flex-col leading-tight min-w-0">
-            <span className="text-sm sm:text-lg font-black tracking-tight bg-gradient-to-r from-pink-300 via-rose-200 to-amber-300 bg-clip-text text-transparent group-hover:brightness-110 transition-all whitespace-nowrap">
+            <span className="text-sm sm:text-lg font-black tracking-tight bg-gradient-to-r from-pink-300 via-pink-200 to-emerald-300 bg-clip-text text-transparent group-hover:brightness-110 transition-all whitespace-nowrap">
               Alas Cerita
             </span>
-            <span className="text-[9.5px] sm:text-[11px] font-medium tracking-wide text-amber-200/90 whitespace-nowrap">
+            <span className="text-[9.5px] sm:text-[11px] font-medium tracking-wide text-emerald-300/90 whitespace-nowrap">
               Creative Picnic Gathering
             </span>
           </div>
@@ -57,11 +57,11 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => onSelectTab('admin_dashboard')}
               className={`whitespace-nowrap shrink-0 flex items-center gap-1.5 py-1.5 transition-colors cursor-pointer ${
                 activeTab === 'admin_dashboard'
-                  ? 'text-amber-300 border-b-2 border-amber-400 font-bold'
-                  : 'text-stone-300 hover:text-amber-200'
+                  ? 'text-emerald-300 border-b-2 border-emerald-400 font-bold'
+                  : 'text-stone-300 hover:text-emerald-200'
               }`}
             >
-              <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
+              <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
               <span className="sm:hidden">Portal Admin</span>
               <span className="hidden sm:inline">Portal Admin &amp; Gate</span>
             </button>
@@ -72,10 +72,10 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-2 shrink-0">
           {isAdminOrStaff ? (
             <div className="flex items-center gap-2">
-              <div className="hidden md:flex items-center gap-2 bg-[#251323]/90 border border-pink-500/25 rounded-xl px-3 py-1.5 text-xs whitespace-nowrap">
+              <div className="hidden md:flex items-center gap-2 bg-[#231221]/90 border border-emerald-500/30 rounded-xl px-3 py-1.5 text-xs whitespace-nowrap">
                 <span className="text-white font-semibold">{currentUser.name}</span>
                 <span className="text-pink-400/50">&middot;</span>
-                <span className="text-[11px] font-mono text-amber-300 font-bold">
+                <span className="text-[11px] font-mono text-emerald-300 font-bold">
                   {getRoleBadge(currentUser.role)}
                 </span>
               </div>
@@ -83,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={onLogoutAdmin}
-                className="px-3 py-2 bg-[#251323] hover:bg-[#32192f] text-stone-200 hover:text-rose-300 border border-pink-500/30 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 min-h-[38px]"
+                className="px-3 py-2 bg-[#231221] hover:bg-[#2d1729] text-stone-200 hover:text-rose-300 border border-pink-500/30 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 min-h-[38px]"
                 title="Keluar dari Portal Admin"
               >
                 <LogOut className="w-3.5 h-3.5 shrink-0" />
@@ -94,7 +94,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onOpenAdminLogin}
-              className="px-3.5 sm:px-4 py-2 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:brightness-110 text-stone-950 rounded-xl text-xs font-black transition-all shadow-md shadow-pink-500/25 flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 min-h-[38px]"
+              className="px-3.5 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 min-h-[38px]"
             >
               <Lock className="w-3.5 h-3.5 shrink-0" />
               <span className="sm:hidden">Admin</span>

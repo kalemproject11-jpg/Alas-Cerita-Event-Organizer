@@ -182,7 +182,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
       {/* Header Info */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg sm:text-xl font-black bg-gradient-to-r from-pink-300 via-rose-200 to-amber-200 bg-clip-text text-transparent">
+          <h2 className="text-lg sm:text-xl font-black bg-gradient-to-r from-pink-300 via-pink-200 to-emerald-300 bg-clip-text text-transparent">
             Verifikasi Pembayaran &amp; Biodata Peserta
           </h2>
           <p className="text-xs text-stone-300 mt-0.5">
@@ -195,16 +195,16 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
             Total Peserta: <strong className="text-white tabular-nums">{issuedTickets.length} Orang</strong>
           </span>
           <span className="text-pink-500/50" aria-hidden="true">&middot;</span>
-          <span className="text-amber-300">
-            Antrean: <strong className="text-[#FACC15] tabular-nums">{pendingBookingsCount} Order</strong>
+          <span className="text-emerald-300">
+            Antrean: <strong className="text-emerald-300 tabular-nums">{pendingBookingsCount} Order</strong>
           </span>
         </div>
       </div>
 
       {feedbackMessage && (
-        <div className="p-3.5 bg-gradient-to-r from-pink-950/90 to-amber-950/90 border border-pink-500/50 rounded-2xl text-amber-200 text-xs flex items-center justify-between gap-3 shadow-lg">
+        <div className="p-3.5 bg-gradient-to-r from-pink-950/90 to-emerald-950/90 border border-emerald-400/50 rounded-2xl text-emerald-200 text-xs flex items-center justify-between gap-3 shadow-lg">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{feedbackMessage}</span>
           </div>
           <button
@@ -226,7 +226,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
             onClick={() => setViewMode('transactions')}
             className={`flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap min-h-[40px] ${
               viewMode === 'transactions'
-                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md shadow-pink-500/25'
+                ? 'bg-pink-500 text-white shadow-md shadow-pink-500/25'
                 : 'text-stone-300 hover:text-white hover:bg-pink-950/40'
             }`}
           >
@@ -239,7 +239,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
             onClick={() => setViewMode('attendees')}
             className={`flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap min-h-[40px] ${
               viewMode === 'attendees'
-                ? 'bg-gradient-to-r from-amber-400 to-yellow-400 text-stone-950 font-black shadow-md shadow-amber-500/25'
+                ? 'bg-emerald-600 text-white font-black shadow-md shadow-emerald-600/25'
                 : 'text-stone-300 hover:text-white hover:bg-pink-950/40'
             }`}
           >
@@ -271,7 +271,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
               onClick={() => setSelectedMethodFilter('all')}
               className={`px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer whitespace-nowrap ${
                 selectedMethodFilter === 'all'
-                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold shadow-sm'
+                  ? 'bg-pink-500 text-white font-bold shadow-sm'
                   : 'bg-[#221221] text-stone-300 hover:text-white border border-pink-950/60'
               }`}
             >
@@ -281,7 +281,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
               onClick={() => setSelectedMethodFilter('qris')}
               className={`px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer whitespace-nowrap ${
                 selectedMethodFilter === 'qris'
-                  ? 'bg-amber-400 text-stone-950 font-black shadow-sm'
+                  ? 'bg-emerald-600 text-white font-black shadow-sm'
                   : 'bg-[#221221] text-stone-300 hover:text-white border border-pink-950/60'
               }`}
             >
@@ -301,7 +301,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
               onClick={() => setSelectedMethodFilter('bri')}
               className={`px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer whitespace-nowrap ${
                 selectedMethodFilter === 'bri'
-                  ? 'bg-amber-400 text-stone-950 font-black shadow-sm'
+                  ? 'bg-emerald-600 text-white font-black shadow-sm'
                   : 'bg-[#221221] text-stone-300 hover:text-white border border-pink-950/60'
               }`}
             >
@@ -335,19 +335,19 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                         </span>
 
                         {isVerified ? (
-                          <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-md border bg-pink-950/80 text-pink-300 border-pink-600/60 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-pink-400" />
+                          <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-md border bg-emerald-950/80 text-emerald-300 border-emerald-500/60 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                             <span>VERIFIKASI DISETUJUI</span>
                           </span>
                         ) : (
-                          <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-md border bg-amber-950/80 text-[#FACC15] border-amber-600/70 flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-amber-400" />
+                          <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-md border bg-pink-950/80 text-pink-200 border-pink-500/60 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-pink-400" />
                             <span>MENUNGGU VERIFIKASI (1 × 24 JAM)</span>
                           </span>
                         )}
 
                         <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-md bg-[#170a16] text-stone-300 border border-pink-900/40">
-                          Metode: <strong className="text-amber-300">{b.paymentMethod || 'QRIS'}</strong>
+                          Metode: <strong className="text-emerald-300">{b.paymentMethod || 'QRIS'}</strong>
                         </span>
 
                         <span className="text-[10px] font-mono text-pink-300/60">
@@ -368,7 +368,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                           <span className="font-bold text-stone-200">
                             {b.quantity} Paket ({relatedTickets.length} Peserta)
                           </span>
-                          <span className="text-[11px] text-[#FACC15] block font-mono font-black">
+                          <span className="text-[11px] text-emerald-300 block font-mono font-black">
                             Rp{b.totalAmount.toLocaleString('id-ID')}
                           </span>
                         </div>
@@ -376,7 +376,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                         <div>
                           <span className="text-[10px] text-pink-300/60 block font-mono">Pengirim &amp; Verifikasi:</span>
                           <span className="text-[11px] text-stone-300 block">
-                            Atas Nama Rekening: <strong className="text-amber-300">{b.senderName || b.customerName}</strong>
+                            Atas Nama Rekening: <strong className="text-emerald-300">{b.senderName || b.customerName}</strong>
                           </span>
                           {b.verifiedBy && (
                             <span className="text-[10px] text-pink-300 block font-mono">
@@ -403,14 +403,14 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                                     <span className="font-mono font-bold text-pink-300 text-[11px]">{t.ticketNumber}</span>
                                     <span className="font-bold text-white truncate">{t.attendeeName}</span>
                                     {t.packageName && (
-                                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-amber-400 text-stone-950">
+                                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-400 text-stone-950">
                                         Paket {t.packageName} #{t.packageMemberIndex || 1}/{t.packageTotalMembers || 1}
                                       </span>
                                     )}
                                   </div>
 
                                   <div className="text-[10px] font-mono text-stone-300 space-x-2">
-                                    <span>Asal/Lembaga: <strong className="text-amber-300">{t.attendeeOrigin || t.attendeeNik || '-'}</strong></span>
+                                    <span>Asal/Lembaga: <strong className="text-emerald-300">{t.attendeeOrigin || t.attendeeNik || '-'}</strong></span>
                                     <span>&bull;</span>
                                     <span>HP: {t.attendeePhone || '-'}</span>
                                   </div>
@@ -421,7 +421,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                                   <button
                                     onClick={() => handleDownloadTicket(t)}
                                     disabled={downloadingTicketId === t.id}
-                                    className="p-1.5 px-2 bg-gradient-to-r from-pink-500 to-rose-500 hover:brightness-110 disabled:opacity-50 text-white rounded-lg text-[10px] font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                                    className="p-1.5 px-2 bg-pink-500 hover:bg-pink-400 disabled:opacity-50 text-white rounded-lg text-[10px] font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
                                     title="Unduh E-Ticket (PNG) untuk dikirim ke peserta ini"
                                   >
                                     <Download className="w-3 h-3" />
@@ -450,7 +450,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                           {/* Image Thumbnail */}
                           <div
                             onClick={() => setSelectedProofToView({ url: b.paymentProofUrl!, title: `Bukti Bayar ${b.invoiceCode} - ${b.customerName}` })}
-                            className="w-20 h-20 rounded-2xl overflow-hidden bg-black border-2 border-amber-300/60 shrink-0 cursor-pointer relative group shadow-md"
+                            className="w-20 h-20 rounded-2xl overflow-hidden bg-black border-2 border-emerald-400/60 shrink-0 cursor-pointer relative group shadow-md"
                             title="Klik untuk memperbesar foto bukti transfer"
                           >
                             <img
@@ -470,14 +470,14 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                               download={`Bukti_Transfer_${b.invoiceCode}_${b.customerName.replace(/\s+/g, '_')}.jpg`}
                               className="w-full px-3 py-1.5 bg-[#251323] hover:bg-[#341a32] text-pink-200 border border-pink-500/30 rounded-xl text-xs font-semibold transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer"
                             >
-                              <Download className="w-3.5 h-3.5 text-amber-300" />
+                              <Download className="w-3.5 h-3.5 text-emerald-300" />
                               <span>Unduh Bukti</span>
                             </a>
 
                             {!isVerified ? (
                               <button
                                 onClick={() => handleVerifyBooking(b.id)}
-                                className="w-full px-3.5 py-2 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:brightness-110 text-stone-950 rounded-xl text-xs font-black transition-all shadow-md shadow-pink-500/25 inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                                className="w-full px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-emerald-600/25 inline-flex items-center justify-center gap-1.5 cursor-pointer"
                               >
                                 <Check className="w-3.5 h-3.5" />
                                 <span>Verifikasi Pembayaran</span>
@@ -485,7 +485,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                             ) : (
                               <button
                                 onClick={() => handleDownloadAllTicketsForBooking(relatedTickets)}
-                                className="w-full px-3 py-1.5 bg-gradient-to-r from-amber-400 to-yellow-400 hover:brightness-110 text-stone-950 rounded-xl text-xs font-black transition-all shadow-md shadow-amber-500/20 inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                                className="w-full px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-emerald-600/20 inline-flex items-center justify-center gap-1.5 cursor-pointer"
                               >
                                 <Download className="w-3.5 h-3.5" />
                                 <span>Unduh Semua Tiket</span>
@@ -566,7 +566,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                             {t.ticketNumber}
                           </span>
                           {t.packageName && (
-                            <span className="font-mono text-[10px] font-bold text-amber-300">
+                            <span className="font-mono text-[10px] font-bold text-emerald-300">
                               Paket {t.packageName} ({t.packageMemberIndex || 1}/{t.packageTotalMembers || 1})
                             </span>
                           )}
@@ -575,15 +575,15 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                       </div>
 
                       {isCheckedIn ? (
-                        <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-2 py-0.5 rounded shrink-0">
+                        <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/50 px-2 py-0.5 rounded shrink-0">
                           MASUK GATE
                         </span>
                       ) : isVerified ? (
-                        <span className="text-[10px] font-mono font-bold text-pink-300 bg-pink-950/80 border border-pink-600/60 px-2 py-0.5 rounded shrink-0">
+                        <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/70 border border-emerald-500/50 px-2 py-0.5 rounded shrink-0">
                           TERVERIFIKASI
                         </span>
                       ) : (
-                        <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-950/80 border border-amber-600/60 px-2 py-0.5 rounded shrink-0">
+                        <span className="text-[10px] font-mono font-bold text-pink-200 bg-pink-950/80 border border-pink-500/50 px-2 py-0.5 rounded shrink-0">
                           PROSES (1×24J)
                         </span>
                       )}
@@ -592,7 +592,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                     <div className="grid grid-cols-1 gap-1.5 p-3 bg-[#150914] rounded-xl border border-pink-500/15 text-[11px] font-mono">
                       <div className="flex justify-between gap-2">
                         <span className="text-pink-300/60">Asal/Lembaga:</span>
-                        <span className="text-amber-300 font-bold text-right truncate">{t.attendeeOrigin || t.attendeeNik || '-'}</span>
+                        <span className="text-emerald-300 font-bold text-right truncate">{t.attendeeOrigin || t.attendeeNik || '-'}</span>
                       </div>
                       <div className="flex justify-between gap-2">
                         <span className="text-pink-300/60">No. HP:</span>
@@ -615,7 +615,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                         type="button"
                         onClick={() => handleDownloadTicket(t)}
                         disabled={downloadingTicketId === t.id}
-                        className="flex-1 py-2.5 px-3 bg-gradient-to-r from-pink-500 to-rose-500 hover:brightness-110 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="flex-1 py-2.5 px-3 bg-pink-500 hover:bg-pink-400 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <Download className="w-3.5 h-3.5" />
                         <span>{downloadingTicketId === t.id ? 'Mengunduh...' : 'Unduh Tiket'}</span>
@@ -686,7 +686,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                           <td className="px-4 py-3.5 font-bold text-white text-xs whitespace-nowrap">
                             {t.attendeeName}
                           </td>
-                          <td className="px-4 py-3.5 text-amber-300 text-xs font-medium max-w-[200px] truncate">
+                          <td className="px-4 py-3.5 text-emerald-300 text-xs font-medium max-w-[200px] truncate">
                             {t.attendeeOrigin || t.attendeeNik || '-'}
                           </td>
                           <td className="px-4 py-3.5 text-stone-200 text-xs whitespace-nowrap space-y-0.5 font-mono">
@@ -695,7 +695,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                           </td>
                           <td className="px-4 py-3.5 whitespace-nowrap">
                             {t.packageName ? (
-                              <span className="font-mono text-[10px] font-bold text-amber-300">
+                              <span className="font-mono text-[10px] font-bold text-emerald-300">
                                 Paket {t.packageName} ({t.packageMemberIndex || 1}/{t.packageTotalMembers || 1})
                               </span>
                             ) : (
@@ -712,15 +712,15 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                           </td>
                           <td className="px-4 py-3.5 whitespace-nowrap">
                             {isCheckedIn ? (
-                              <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-2 py-0.5 rounded">
+                              <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/50 px-2 py-0.5 rounded">
                                 SUDAH MASUK GATE
                               </span>
                             ) : isVerified ? (
-                              <span className="text-[10px] font-mono font-bold text-pink-300 bg-pink-950/80 border border-pink-600/60 px-2 py-0.5 rounded">
+                              <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/70 border border-emerald-500/50 px-2 py-0.5 rounded">
                                 TERVERIFIKASI
                               </span>
                             ) : (
-                              <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-950/80 border border-amber-600/60 px-2 py-0.5 rounded">
+                              <span className="text-[10px] font-mono font-bold text-pink-200 bg-pink-950/80 border border-pink-500/50 px-2 py-0.5 rounded">
                                 MENUNGGU (1×24J)
                               </span>
                             )}
@@ -731,7 +731,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                                 type="button"
                                 onClick={() => handleDownloadTicket(t)}
                                 disabled={downloadingTicketId === t.id}
-                                className="px-2.5 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 hover:brightness-110 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                                className="px-2.5 py-1.5 bg-pink-500 hover:bg-pink-400 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer"
                                 title="Unduh file gambar E-Ticket PNG untuk dikirim ke peserta via email/WA"
                               >
                                 <Download className="w-3.5 h-3.5" />
@@ -787,7 +787,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                 <a
                   href={selectedProofToView.url}
                   download="Bukti_Transfer_AlasCerita.jpg"
-                  className="px-3 py-1.5 bg-[#FA7022] hover:bg-[#e05e13] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors"
+                  className="px-3 py-1.5 bg-pink-500 hover:bg-pink-400 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Unduh File</span>
@@ -832,7 +832,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
             <div className="space-y-1.5">
               <h3 className="text-lg font-bold text-white">Hapus Transaksi Ini?</h3>
               <p className="text-xs text-stone-300 leading-relaxed">
-                Anda akan menghapus transaksi <strong className="text-amber-300">{confirmDeleteBooking.invoiceCode}</strong> atas nama <strong className="text-white">{confirmDeleteBooking.customerName}</strong>. Seluruh lembar tiket yang diterbitkan untuk pesanan ini juga akan terhapus.
+                Anda akan menghapus transaksi <strong className="text-emerald-300">{confirmDeleteBooking.invoiceCode}</strong> atas nama <strong className="text-white">{confirmDeleteBooking.customerName}</strong>. Seluruh lembar tiket yang diterbitkan untuk pesanan ini juga akan terhapus.
               </p>
             </div>
 
@@ -849,7 +849,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                 type="button"
                 onClick={executeDeleteBooking}
                 disabled={isDeleting}
-                className="px-4 py-2.5 bg-gradient-to-r from-rose-600 to-rose-700 hover:brightness-110 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-rose-950/30 flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-rose-950/30 flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Transaksi'}</span>
@@ -887,7 +887,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                 type="button"
                 onClick={executeDeleteTicket}
                 disabled={isDeleting}
-                className="px-4 py-2.5 bg-gradient-to-r from-rose-600 to-rose-700 hover:brightness-110 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-rose-950/30 flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-rose-950/30 flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Tiket'}</span>
@@ -900,13 +900,13 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
       {/* Confirmation Modal: Clear ALL Simulation Data */}
       {showConfirmClearAll && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="w-full max-w-lg bg-[#1c0f1c] border-2 border-amber-500/50 rounded-3xl p-6 shadow-2xl space-y-4 text-left">
-            <div className="w-12 h-12 rounded-2xl bg-amber-950/80 border border-amber-600/70 flex items-center justify-center text-amber-300">
+          <div className="w-full max-w-lg bg-[#1c0f1c] border-2 border-pink-500/50 rounded-3xl p-6 shadow-2xl space-y-4 text-left">
+            <div className="w-12 h-12 rounded-2xl bg-rose-950/80 border border-rose-600/70 flex items-center justify-center text-rose-300">
               <AlertTriangle className="w-6 h-6" />
             </div>
 
             <div className="space-y-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-300 bg-amber-950/70 border border-amber-600/60 px-2.5 py-0.5 rounded-full inline-block">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-pink-300 bg-pink-950/70 border border-pink-500/60 px-2.5 py-0.5 rounded-full inline-block">
                 PEMBERSIHAN DATA SIMULASI UNTUK LIVE PRODUKSI
               </span>
               <h3 className="text-xl font-black text-white">
@@ -916,7 +916,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                 Tindakan ini akan menghapus <strong>seluruh data transaksi simulasi, tiket uji coba, dan riwayat scan ganda</strong> dari sistem dan Cloud Firestore.
               </p>
               <div className="p-3 bg-[#170a16] rounded-xl border border-pink-500/25 space-y-1.5 text-xs">
-                <span className="font-bold text-amber-300 block">Kondisi Setelah Dihapus:</span>
+                <span className="font-bold text-emerald-300 block">Kondisi Setelah Dihapus:</span>
                 <ul className="list-disc list-inside space-y-1 text-stone-300 text-[11px]">
                   <li>Total Transaksi: <strong>0 Transaksi</strong> (kosong)</li>
                   <li>Total Peserta: <strong>0 Orang</strong> (kosong)</li>
@@ -943,7 +943,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                 type="button"
                 onClick={executeClearAllSimulation}
                 disabled={isDeleting}
-                className="px-5 py-2.5 bg-gradient-to-r from-rose-600 via-rose-700 to-amber-600 hover:brightness-110 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-rose-950/30 flex items-center gap-1.5 cursor-pointer"
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-rose-950/30 flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{isDeleting ? 'Membersihkan Database...' : 'Ya, Bersihkan Seluruh Data Simulasi'}</span>

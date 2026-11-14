@@ -82,12 +82,12 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
         {/* Header with Logo Badge */}
         <div className="text-center space-y-3">
-          <div className="w-14 h-14 rounded-2xl bg-white p-1 mx-auto shadow-lg shadow-pink-500/20 border-2 border-amber-300 flex items-center justify-center overflow-hidden">
+          <div className="w-14 h-14 rounded-2xl bg-white p-1 mx-auto shadow-lg shadow-pink-500/20 border-2 border-emerald-400 flex items-center justify-center overflow-hidden">
             <img src="/alas-cerita-logo.jpg" alt="Alas Cerita" className="w-full h-full object-contain" />
           </div>
 
           <div>
-            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-300 inline-flex items-center gap-1.5 mb-1">
+            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-300 inline-flex items-center gap-1.5 mb-1">
               <Lock className="w-3 h-3 text-pink-400" />
               <span>Akses Khusus Admin &amp; Gate</span>
             </span>
@@ -148,7 +148,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
           <button
             type="submit"
-            className="w-full py-3.5 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 hover:brightness-110 text-stone-950 text-xs font-black rounded-xl transition-all shadow-lg shadow-pink-500/25 flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
+            className="w-full py-3.5 bg-pink-500 hover:bg-pink-400 text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-pink-500/25 flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
           >
             <span>Masuk ke Portal Admin</span>
             <ArrowRight className="w-4 h-4" />

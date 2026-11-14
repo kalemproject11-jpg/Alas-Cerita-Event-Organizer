@@ -374,7 +374,7 @@ class StorageService {
       const parsed: Event[] = data ? JSON.parse(data) : INITIAL_EVENTS;
       return parsed.map((evt) =>
         evt.id === 'evt_alas_cerita_2026'
-          ? { ...evt, posterUrl: '/assets/aistudio/alas-cerita-poster_fb646400.jpeg' }
+          ? { ...evt, posterUrl: '/assets/aistudio/WhatsApp_Image_2026-11-14_at_19.20.45_a24d6398.jpeg' }
           : evt
       );
     } catch {
