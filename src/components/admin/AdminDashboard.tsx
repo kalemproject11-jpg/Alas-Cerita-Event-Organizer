@@ -291,81 +291,138 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
-            {/* Ticket Tiers Breakdown */}
+            {/* Ticket Tiers Breakdown (Live Real-Time Sync with Bookings & Issued Tickets) */}
             <div className="space-y-3 pt-4 border-t border-pink-500/20">
-              <span className="text-xs font-bold uppercase tracking-wider text-stone-200 block">
-                Manajemen Kategori &amp; Kuota Tiket (Tiered Allocation)
-              </span>
+              {(() => {
+                const tierSnapshots = currentEventTiers.map((tier) => ({
+                  tier,
+                  stats: storageService.getTierAllocationStats(tier, bookings, issuedTickets),
+                }));
+                const totalQuotaPackages = tierSnapshots.reduce((sum, item) => sum + item.tier.quota, 0);
+                const totalUsedPackages = tierSnapshots.reduce((sum, item) => sum + item.stats.totalUsedPackages, 0);
+                const totalRemainingPackages = tierSnapshots.reduce((sum, item) => sum + item.stats.remainingPackages, 0);
+                const totalAttendees = tierSnapshots.reduce((sum, item) => sum + item.stats.attendeeCount, 0);
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {currentEventTiers.map((tier) => {
-                  const isSingleTier = tier.id === 'tt_alas_single' || tier.name.toLowerCase().includes('single');
-                  const singleInfo = isSingleTier ? storageService.getSinglePricingInfo() : null;
-                  const sold = isSingleTier && singleInfo
-                    ? singleInfo.registeredCount
-                    : Math.max(0, tier.quota - tier.availableQuota);
-                  const remaining = Math.max(0, tier.quota - sold);
-                  const percentSold = tier.quota > 0 ? Math.min(100, Math.round((sold / tier.quota) * 100)) : 0;
-
-                  return (
-                    <div
-                      key={tier.id}
-                      className="p-4 bg-[#170a16] rounded-xl border border-pink-500/25 space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm text-white">{tier.name}</span>
-                        <span className="font-mono text-xs font-semibold text-emerald-300">
-                          Rp {tier.price.toLocaleString('id-ID')}
+                return (
+                  <>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-stone-200 block">
+                        Manajemen Kategori &amp; Kuota Tiket (Tiered Allocation)
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono">
+                        <span className="text-emerald-300 font-bold">
+                          Terisi: {totalUsedPackages} / {totalQuotaPackages} paket ({totalAttendees} peserta)
+                        </span>
+                        <span className="text-pink-500/50" aria-hidden="true">&middot;</span>
+                        <span className="text-pink-200">
+                          Sisa Total: <strong className="text-white">{totalRemainingPackages} paket</strong>
                         </span>
                       </div>
-
-                      {/* Quota Progress Bar */}
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between text-[11px] text-stone-400 font-mono">
-                          <span>Terdaftar: {sold} / {tier.quota}</span>
-                          <span>{percentSold}%</span>
-                        </div>
-                        <div className="w-full h-2 bg-stone-800 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full transition-all ${
-                              percentSold >= 100
-                                ? 'bg-rose-500'
-                                : percentSold > 70
-                                ? 'bg-pink-500'
-                                : 'bg-emerald-500'
-                            }`}
-                            style={{ width: `${percentSold}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-[11px] text-stone-400 pt-1">
-                        <span>Sisa Kuota:</span>
-                        <span className={`font-mono font-bold ${remaining <= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                          {remaining <= 0 ? 'SOLD OUT' : `${remaining} lembar`}
-                        </span>
-                      </div>
-
-                      {isSingleTier && singleInfo && (
-                        <div className="pt-2.5 border-t border-pink-500/20 space-y-1.5 text-[11px] font-mono">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-stone-300">Pendaftar 1–13 (Rp70.000):</span>
-                            <span className={`font-bold ${singleInfo.isPromoActive ? 'text-emerald-300' : 'text-stone-400'}`}>
-                              {Math.min(singleInfo.registeredCount, 13)}/13 {singleInfo.isPromoActive ? '· AKTIF' : '· PENUH'}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-stone-300">Pendaftar 14+ (Rp80.000):</span>
-                            <span className={`font-bold ${!singleInfo.isPromoActive ? 'text-pink-300' : 'text-stone-400'}`}>
-                              {Math.max(0, singleInfo.registeredCount - 13)} org {!singleInfo.isPromoActive ? '· AKTIF' : ''}
-                            </span>
-                          </div>
-                        </div>
-                      )}
                     </div>
-                  );
-                })}
-              </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {tierSnapshots.map(({ tier, stats }) => {
+                        const isSingleTier = tier.id === 'tt_alas_single' || tier.name.toLowerCase().includes('single');
+                        const isSinglePromoActive = stats.totalUsedPackages < 13;
+
+                        return (
+                          <div
+                            key={tier.id}
+                            className="p-4 bg-[#170a16] rounded-xl border border-pink-500/25 space-y-3 flex flex-col justify-between"
+                          >
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="font-bold text-sm text-white truncate">{tier.name}</span>
+                                  <span className="text-[10px] font-mono text-pink-300/80 shrink-0">
+                                    ({stats.capacityPerPackage} org/paket)
+                                  </span>
+                                </div>
+                                <span className="font-mono text-xs font-semibold text-emerald-300 shrink-0">
+                                  Rp {stats.activePrice.toLocaleString('id-ID')}
+                                </span>
+                              </div>
+
+                              {/* Quota Progress Bar */}
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between text-[11px] text-stone-400 font-mono">
+                                  <span>Terdaftar: {stats.totalUsedPackages} / {tier.quota} paket</span>
+                                  <span>{stats.percentSold}%</span>
+                                </div>
+                                <div className="w-full h-2 bg-stone-800 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full transition-all ${
+                                      stats.percentSold >= 100
+                                        ? 'bg-rose-500'
+                                        : stats.percentSold > 70
+                                        ? 'bg-pink-500'
+                                        : 'bg-emerald-500'
+                                    }`}
+                                    style={{ width: `${stats.percentSold}%` }}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-1.5 text-[11px] font-mono pt-1">
+                                <div className="flex items-center justify-between text-stone-300">
+                                  <span>Sisa Kuota:</span>
+                                  <span className={`font-bold ${stats.remainingPackages <= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                    {stats.remainingPackages <= 0 ? 'SOLD OUT' : `${stats.remainingPackages} paket`}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center justify-between text-stone-300">
+                                  <span>Peserta Terdaftar:</span>
+                                  <span className="font-bold text-white">
+                                    {stats.attendeeCount} orang{stats.checkedInCount > 0 ? ` (${stats.checkedInCount} hadir)` : ''}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center justify-between text-stone-300">
+                                  <span>Status Verifikasi:</span>
+                                  <span className="text-right">
+                                    <strong className="text-emerald-300">{stats.verifiedBookingsCount} sah</strong>
+                                    {stats.awaitingVerificationCount > 0 && (
+                                      <span className="text-pink-300"> · {stats.awaitingVerificationCount} antre</span>
+                                    )}
+                                    {stats.pendingBookingsCount > 0 && (
+                                      <span className="text-stone-400"> · {stats.pendingBookingsCount} pending</span>
+                                    )}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center justify-between text-stone-300">
+                                  <span>Omset Kategori:</span>
+                                  <span className="font-bold text-emerald-300">
+                                    Rp {stats.revenue.toLocaleString('id-ID')}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {isSingleTier && (
+                              <div className="pt-2.5 border-t border-pink-500/20 space-y-1.5 text-[11px] font-mono">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-stone-300">Pendaftar 1–13 (Rp70.000):</span>
+                                  <span className={`font-bold ${isSinglePromoActive ? 'text-emerald-300' : 'text-stone-400'}`}>
+                                    {Math.min(stats.totalUsedPackages, 13)}/13 {isSinglePromoActive ? '· AKTIF' : '· PENUH'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-stone-300">Pendaftar 14+ (Rp80.000):</span>
+                                  <span className={`font-bold ${!isSinglePromoActive ? 'text-pink-300' : 'text-stone-400'}`}>
+                                    {Math.max(0, stats.totalUsedPackages - 13)} org {!isSinglePromoActive ? '· AKTIF' : ''}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         )}

@@ -102,6 +102,7 @@ class StorageService {
   private logsCache: CheckInLog[] | null = null;
   private pendingAttendeesMap: Map<string, Array<{ name: string; email: string; phone: string; origin: string }>> = new Map();
   private syncedBookingPriceIds: Set<string> = new Set();
+  private syncedTierSignatures: Map<string, string> = new Map();
 
   constructor() {
     this.initializeDefaults();
@@ -121,7 +122,7 @@ class StorageService {
           const list: TicketType[] = [];
           snapshot.forEach((d) => list.push(d.data() as TicketType));
           this.ticketTypesCache = list;
-          safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, list);
+          this.reconcileTicketTypesWithActualData(true);
           this.notify();
         } else if (!isCleared) {
           INITIAL_TICKET_TYPES.forEach((tt) => {
@@ -140,6 +141,7 @@ class StorageService {
         const reconciled = this.reconcileSingleBookingPrices(list, true);
         this.bookingsCache = reconciled;
         safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, reconciled);
+        this.reconcileTicketTypesWithActualData(true);
         this.notify();
       }, (err) => logFirestoreError(err, 'list', 'bookings'));
 
@@ -154,6 +156,7 @@ class StorageService {
         });
         this.issuedTicketsCache = list;
         safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, list);
+        this.reconcileTicketTypesWithActualData(true);
         this.notify();
       }, (err) => logFirestoreError(err, 'list', 'issuedTickets'));
 
@@ -412,6 +415,223 @@ class StorageService {
     this.notify();
   }
 
+  private getTierPackageCapacity(tier: Pick<TicketType, 'id' | 'name'>): number {
+    const lowerName = (tier.name || '').toLowerCase();
+    if (tier.id === 'tt_alas_couple' || lowerName.includes('couple')) return 2;
+    if (tier.id === 'tt_alas_circle' || lowerName.includes('circle')) return 3;
+    return 1;
+  }
+
+  private isSingleTier(tier: Pick<TicketType, 'id' | 'name'>): boolean {
+    return tier.id === 'tt_alas_single' || (tier.name || '').toLowerCase().includes('single');
+  }
+
+  public getTierAllocationStats(
+    tier: TicketType,
+    bookingsInput?: Booking[],
+    issuedTicketsInput?: IssuedTicket[]
+  ): {
+    capacityPerPackage: number;
+    soldPackages: number;
+    heldPackages: number;
+    totalUsedPackages: number;
+    remainingPackages: number;
+    percentSold: number;
+    attendeeCount: number;
+    checkedInCount: number;
+    verifiedBookingsCount: number;
+    awaitingVerificationCount: number;
+    pendingBookingsCount: number;
+    revenue: number;
+    activePrice: number;
+  } {
+    const bookings = bookingsInput ?? this.getBookings();
+    const issuedTickets = issuedTicketsInput ?? this.getIssuedTickets();
+    const capacityPerPackage = this.getTierPackageCapacity(tier);
+    const tierNameLower = (tier.name || '').toLowerCase();
+    const isSingle = this.isSingleTier(tier);
+    const nowMs = Date.now();
+
+    const bookingTicketMap = new Map<string, IssuedTicket[]>();
+    issuedTickets.forEach((t) => {
+      if (!t.bookingId) return;
+      const arr = bookingTicketMap.get(t.bookingId) || [];
+      arr.push(t);
+      bookingTicketMap.set(t.bookingId, arr);
+    });
+
+    const matchesBookingTier = (b: Booking): boolean => {
+      if (b.ticketTypeId === tier.id) return true;
+      const linkedTickets = bookingTicketMap.get(b.id) || [];
+      if (
+        linkedTickets.some(
+          (t) => t.ticketTypeId === tier.id || (t.packageName || '').toLowerCase() === tierNameLower
+        )
+      ) {
+        return true;
+      }
+      if (!b.ticketTypeId) {
+        if (isSingle && (b.totalAmount === SINGLE_PROMO_PRICE || b.totalAmount === SINGLE_REGULAR_PRICE)) {
+          return true;
+        }
+        if (tier.id === 'tt_alas_couple' && b.totalAmount === 155000) return true;
+        if (tier.id === 'tt_alas_circle' && b.totalAmount === 225000) return true;
+      }
+      return false;
+    };
+
+    const paidBookings = bookings.filter((b) => b.paymentStatus === 'paid' && matchesBookingTier(b));
+    const pendingBookings = bookings.filter(
+      (b) => b.paymentStatus === 'pending' && new Date(b.expiresAt).getTime() > nowMs && matchesBookingTier(b)
+    );
+
+    const paidBookingIds = new Set(paidBookings.map((b) => b.id));
+    const expiredBookingIds = new Set(
+      bookings.filter((b) => b.paymentStatus === 'expired').map((b) => b.id)
+    );
+
+    const tierTickets = issuedTickets.filter((t) => {
+      if (t.bookingId && expiredBookingIds.has(t.bookingId)) return false;
+      return (
+        t.ticketTypeId === tier.id ||
+        (t.packageName || '').toLowerCase() === tierNameLower ||
+        (t.bookingId ? paidBookingIds.has(t.bookingId) : false)
+      );
+    });
+
+    // Orphan issued tickets (if any exist without an associated paid booking record)
+    const orphanTicketsByBooking = new Map<string, IssuedTicket[]>();
+    tierTickets.forEach((t) => {
+      if (!t.bookingId || !paidBookingIds.has(t.bookingId)) {
+        const key = t.bookingId || t.id;
+        const arr = orphanTicketsByBooking.get(key) || [];
+        arr.push(t);
+        orphanTicketsByBooking.set(key, arr);
+      }
+    });
+
+    let orphanPackages = 0;
+    orphanTicketsByBooking.forEach((groupTickets) => {
+      orphanPackages += Math.max(1, Math.ceil(groupTickets.length / capacityPerPackage));
+    });
+
+    const soldFromBookings = paidBookings.reduce((sum, b) => sum + Math.max(1, b.quantity || 1), 0);
+    const soldPackages = soldFromBookings + orphanPackages;
+    const heldPackages = pendingBookings.reduce((sum, b) => sum + Math.max(1, b.quantity || 1), 0);
+    const totalUsedPackages = soldPackages + heldPackages;
+    const remainingPackages = Math.max(0, tier.quota - totalUsedPackages);
+    const percentSold = tier.quota > 0 ? Math.min(100, Math.round((totalUsedPackages / tier.quota) * 100)) : 0;
+
+    // Count actual attendees across issuedTickets + any bookings without issued tickets yet
+    let missingTicketAttendees = 0;
+    paidBookings.forEach((b) => {
+      const linked = bookingTicketMap.get(b.id) || [];
+      if (linked.length === 0) {
+        missingTicketAttendees += Math.max(1, b.quantity || 1) * capacityPerPackage;
+      }
+    });
+    pendingBookings.forEach((b) => {
+      missingTicketAttendees += Math.max(1, b.quantity || 1) * capacityPerPackage;
+    });
+
+    const attendeeCount = tierTickets.length + missingTicketAttendees;
+    const checkedInCount = tierTickets.filter((t) => t.status === 'checked-in').length;
+    const verifiedBookingsCount = paidBookings.filter((b) => b.verificationStatus === 'verified').length;
+    const awaitingVerificationCount = paidBookings.filter((b) => b.verificationStatus !== 'verified').length;
+    const revenue = paidBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+
+    const activePrice = isSingle
+      ? totalUsedPackages < SINGLE_PROMO_LIMIT
+        ? SINGLE_PROMO_PRICE
+        : SINGLE_REGULAR_PRICE
+      : tier.price;
+
+    return {
+      capacityPerPackage,
+      soldPackages,
+      heldPackages,
+      totalUsedPackages,
+      remainingPackages,
+      percentSold,
+      attendeeCount,
+      checkedInCount,
+      verifiedBookingsCount,
+      awaitingVerificationCount,
+      pendingBookingsCount: pendingBookings.length,
+      revenue,
+      activePrice,
+    };
+  }
+
+  private getRawTicketTypes(): TicketType[] {
+    try {
+      if (this.ticketTypesCache) return this.ticketTypesCache;
+      const data = localStorage.getItem(STORAGE_KEYS.TICKET_TYPES);
+      const parsed: TicketType[] = data ? JSON.parse(data) : INITIAL_TICKET_TYPES;
+      this.ticketTypesCache = parsed;
+      return parsed;
+    } catch {
+      return INITIAL_TICKET_TYPES;
+    }
+  }
+
+  private reconcileTicketTypesWithActualData(syncFirestore = false) {
+    const rawTiers = this.getRawTicketTypes();
+    if (rawTiers.length === 0) return;
+
+    const bookings = this.getBookings();
+    const issuedTickets = this.getIssuedTickets();
+    let changed = false;
+
+    const updatedTiers = rawTiers.map((tt) => {
+      const stats = this.getTierAllocationStats(tt, bookings, issuedTickets);
+      const targetDescription = this.isSingleTier(tt)
+        ? 'Paket untuk 1 orang peserta. Pendaftar 1–13 seharga Rp70.000, pendaftar ke-14 ke atas seharga Rp80.000.'
+        : tt.description;
+
+      if (
+        tt.availableQuota !== stats.remainingPackages ||
+        (tt.heldQuota || 0) !== stats.heldPackages ||
+        tt.price !== stats.activePrice ||
+        tt.description !== targetDescription
+      ) {
+        changed = true;
+      }
+
+      if (syncFirestore) {
+        const signature = `${stats.remainingPackages}|${stats.heldPackages}|${stats.activePrice}`;
+        const prevSig = this.syncedTierSignatures.get(tt.id);
+        if (
+          prevSig !== signature &&
+          (tt.availableQuota !== stats.remainingPackages ||
+            (tt.heldQuota || 0) !== stats.heldPackages ||
+            tt.price !== stats.activePrice)
+        ) {
+          this.syncedTierSignatures.set(tt.id, signature);
+          updateDoc(doc(db, 'ticketTypes', tt.id), {
+            availableQuota: stats.remainingPackages,
+            heldQuota: stats.heldPackages,
+            price: stats.activePrice,
+            description: targetDescription,
+          }).catch((err) => logFirestoreError(err, 'update', `ticketTypes/${tt.id}`));
+        }
+      }
+
+      return {
+        ...tt,
+        price: stats.activePrice,
+        availableQuota: stats.remainingPackages,
+        heldQuota: stats.heldPackages,
+        description: targetDescription,
+      };
+    });
+
+    if (changed) {
+      this.ticketTypesCache = updatedTiers;
+      safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, updatedTiers);
+    }
+  }
+
   // --- Single Tiered Pricing (1–13 = Rp 70.000, 14+ = Rp 80.000) ---
   public getSinglePricingInfo(): {
     registeredCount: number;
@@ -423,23 +643,10 @@ class StorageService {
     activePrice: number;
     isPromoActive: boolean;
   } {
-    const issuedTickets = this.getIssuedTickets();
-    const issuedSingleCount = issuedTickets.filter(
-      (t) => t.ticketTypeId === 'tt_alas_single' || t.packageName?.toLowerCase() === 'single'
-    ).length;
-
-    const nowMs = Date.now();
-    const bookings = this.getBookings();
-    const activePendingSingleQty = bookings
-      .filter(
-        (b) =>
-          b.ticketTypeId === 'tt_alas_single' &&
-          b.paymentStatus === 'pending' &&
-          new Date(b.expiresAt).getTime() > nowMs
-      )
-      .reduce((sum, b) => sum + (b.quantity || 1), 0);
-
-    const registeredCount = issuedSingleCount + activePendingSingleQty;
+    const rawSingle =
+      this.getRawTicketTypes().find((t) => t.id === 'tt_alas_single') || INITIAL_TICKET_TYPES[0];
+    const stats = this.getTierAllocationStats(rawSingle);
+    const registeredCount = stats.totalUsedPackages;
     const nextNumber = registeredCount + 1;
     const isPromoActive = registeredCount < SINGLE_PROMO_LIMIT;
     const promoRemaining = Math.max(0, SINGLE_PROMO_LIMIT - registeredCount);
@@ -469,26 +676,22 @@ class StorageService {
   // --- Ticket Types ---
   public getTicketTypes(eventId?: string): TicketType[] {
     try {
-      let all: TicketType[];
-      if (this.ticketTypesCache) {
-        all = this.ticketTypesCache;
-      } else {
-        const data = localStorage.getItem(STORAGE_KEYS.TICKET_TYPES);
-        all = data ? JSON.parse(data) : INITIAL_TICKET_TYPES;
-        this.ticketTypesCache = all;
-      }
+      const all = this.getRawTicketTypes();
+      const bookings = this.getBookings();
+      const issuedTickets = this.getIssuedTickets();
 
-      const singlePrice = this.getSinglePricingInfo().activePrice;
-      const resolved = all.map((tt) =>
-        tt.id === 'tt_alas_single'
-          ? {
-              ...tt,
-              price: singlePrice,
-              description:
-                'Paket untuk 1 orang peserta. Pendaftar 1–13 seharga Rp70.000, pendaftar ke-14 ke atas seharga Rp80.000.',
-            }
-          : tt
-      );
+      const resolved = all.map((tt) => {
+        const stats = this.getTierAllocationStats(tt, bookings, issuedTickets);
+        return {
+          ...tt,
+          price: stats.activePrice,
+          availableQuota: stats.remainingPackages,
+          heldQuota: stats.heldPackages,
+          description: this.isSingleTier(tt)
+            ? 'Paket untuk 1 orang peserta. Pendaftar 1–13 seharga Rp70.000, pendaftar ke-14 ke atas seharga Rp80.000.'
+            : tt.description,
+        };
+      });
 
       return eventId ? resolved.filter((tt) => tt.eventId === eventId) : resolved;
     } catch {
@@ -600,7 +803,7 @@ class StorageService {
     this.logsCache = remainingLogs;
     safeSetLocalStorage(STORAGE_KEYS.LOGS, remainingLogs);
 
-    // Delete in Firestore
+    // Delete in Firestore and resync live tier quotas
     try {
       await Promise.all([
         deleteDoc(doc(db, 'bookings', bookingId)),
@@ -610,6 +813,7 @@ class StorageService {
       logFirestoreError(err, 'delete', `bookings/${bookingId}`);
     }
 
+    this.reconcileTicketTypesWithActualData(true);
     this.notify();
     return {
       success: true,
@@ -977,6 +1181,7 @@ class StorageService {
       logFirestoreError(err, 'delete', `issuedTickets/${ticketId}`);
     }
 
+    this.reconcileTicketTypesWithActualData(true);
     this.notify();
     return {
       success: true,
