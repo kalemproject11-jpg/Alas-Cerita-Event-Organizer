@@ -19,6 +19,11 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const supportsWebkitTextSecurity =
+    typeof CSS !== 'undefined' &&
+    typeof CSS.supports === 'function' &&
+    CSS.supports('-webkit-text-security', 'disc');
+
   useEffect(() => {
     if (isOpen) {
       setUsername('');
@@ -32,8 +37,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   const adminUsers = users.filter((u) => u.role !== 'customer');
   const superAdmin = adminUsers.find((u) => u.role === 'super_admin') || adminUsers[0];
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = () => {
     setErrorMessage(null);
 
     const cleanUser = username.trim().toLowerCase();
@@ -48,6 +52,8 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       (cleanUser === 'alasceritaeo' && cleanPass === 'alcer5desember') ||
       (cleanUser === 'admin@alascerita.id' && cleanPass === 'alcer5desember')
     ) {
+      setUsername('');
+      setPassword('');
       onSuccessLogin(superAdmin);
       onClose();
       return;
@@ -59,12 +65,21 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
         u.name.toLowerCase() === cleanUser
     );
     if (staffMatch && cleanPass === 'alcer5desember') {
+      setUsername('');
+      setPassword('');
       onSuccessLogin(staffMatch);
       onClose();
       return;
     }
 
     setErrorMessage('Username atau password salah. Silakan periksa kembali.');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleLogin();
+    }
   };
 
   return (
@@ -98,43 +113,59 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           </div>
         </div>
 
-        {/* Login Form */}
-        <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
+        {/* Non-form credential container so browsers never trigger "Save password" prompts */}
+        <div className="space-y-4">
           <div>
-            <label htmlFor="admin-username" className="text-xs font-semibold text-stone-200 block mb-1.5">
+            <label htmlFor="portal-user-code" className="text-xs font-semibold text-stone-200 block mb-1.5">
               Username Admin
             </label>
             <div className="relative">
               <User className="w-4 h-4 text-pink-400/70 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
-                id="admin-username"
+                id="portal-user-code"
+                name="portal_user_code"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Masukkan username"
                 autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-form-type="other"
                 className="w-full pl-10 pr-4 py-2.5 text-sm bg-[#150914] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400"
                 autoFocus
-                required
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="admin-password" className="text-xs font-semibold text-stone-200 block mb-1.5">
+            <label htmlFor="portal-access-key" className="text-xs font-semibold text-stone-200 block mb-1.5">
               Password Admin
             </label>
             <div className="relative">
               <KeyRound className="w-4 h-4 text-pink-400/70 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
-                id="admin-password"
-                type="password"
+                id="portal-access-key"
+                name="portal_access_key"
+                type={supportsWebkitTextSecurity ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Masukkan password"
-                autoComplete="new-password"
-                className="w-full pl-10 pr-4 py-2.5 text-sm bg-[#150914] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400"
-                required
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-form-type="other"
+                className={`w-full pl-10 pr-4 py-2.5 text-sm bg-[#150914] border border-pink-500/30 rounded-xl text-white placeholder-stone-500 focus:outline-none focus:border-pink-400 ${
+                  supportsWebkitTextSecurity ? '[-webkit-text-security:disc]' : ''
+                }`}
               />
             </div>
           </div>
@@ -147,13 +178,14 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           )}
 
           <button
-            type="submit"
+            type="button"
+            onClick={handleLogin}
             className="w-full py-3.5 bg-pink-500 hover:bg-pink-400 text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-pink-500/25 flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
           >
             <span>Masuk ke Portal Admin</span>
             <ArrowRight className="w-4 h-4" />
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Event, TicketType, Booking, IssuedTicket, CheckInLog } from './types';
 import { storageService } from './services/storageService';
 import { Header } from './components/Header';
@@ -34,6 +34,8 @@ export default function App() {
   const [initialTicketToScan, setInitialTicketToScan] = useState<IssuedTicket | null>(null);
   const [customerSuccessTicket, setCustomerSuccessTicket] = useState<IssuedTicket | null>(null);
   const [appError, setAppError] = useState<string | null>(null);
+  const prevRoleRef = useRef(currentUser.role);
+  const isSelfLogoutRef = useRef(false);
 
   // Subscribe to storage updates
   useEffect(() => {
@@ -50,7 +52,24 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Automatically kick out remotely revoked admin sessions back to public catalog
+  useEffect(() => {
+    if (prevRoleRef.current !== 'customer' && currentUser.role === 'customer') {
+      if (!isSelfLogoutRef.current) {
+        setAppError('Sesi admin Anda telah diakhiri karena ada login admin baru atau sesi dicabut dari perangkat lain.');
+      }
+      isSelfLogoutRef.current = false;
+      if (activeTab === 'admin_dashboard') {
+        setActiveTab('catalog');
+      }
+    } else if (currentUser.role === 'customer' && activeTab === 'admin_dashboard') {
+      setActiveTab('catalog');
+    }
+    prevRoleRef.current = currentUser.role;
+  }, [currentUser.role, activeTab]);
+
   const handleAdminLoginSuccess = (adminUser: User) => {
+    setAppError(null);
     storageService.setCurrentUser(adminUser.id);
     setCurrentUser(adminUser);
     setActiveTab('admin_dashboard');
@@ -58,6 +77,7 @@ export default function App() {
   };
 
   const handleLogoutAdmin = () => {
+    isSelfLogoutRef.current = true;
     const customerUser = users.find((u) => u.role === 'customer') || users[1];
     if (customerUser) {
       storageService.setCurrentUser(customerUser.id);

@@ -19,7 +19,12 @@ const STORAGE_KEYS = {
   SIMULATION_CLEARED: 'alas_cerita_simulation_cleared_v1',
   MY_LOCAL_BOOKINGS: 'alas_cerita_my_local_bookings_v1',
   MY_LOCAL_TICKETS: 'alas_cerita_my_local_tickets_v1',
+  ADMIN_SESSION_USER: 'alas_cerita_admin_session_user_v1',
+  ADMIN_SESSION_EPOCH: 'alas_cerita_admin_session_epoch_v1',
 };
+
+// Every pre-existing admin session created prior to 2026-11-16T15:47:00Z is automatically invalidated
+const MIN_VALID_ADMIN_EPOCH = Date.UTC(2026, 10, 16, 15, 47, 0);
 
 // Safe alphanumeric character set for visual ticket_number (omits ambiguous 0, O, 1, I)
 const TICKET_NUMBER_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -97,6 +102,7 @@ class StorageService {
   private listeners: Set<() => void> = new Set();
   private isFirestoreSynced = false;
   private hasFirestoreBookingsSync = false;
+  private cloudAdminEpoch = MIN_VALID_ADMIN_EPOCH;
 
   // Canonical in-memory caches so large multi-phone datasets never hit localStorage 5MB limit
   private bookingsCache: Booking[] | null = null;
@@ -174,6 +180,21 @@ class StorageService {
         safeSetLocalStorage(STORAGE_KEYS.LOGS, sliced);
         this.notify();
       }, (err) => logFirestoreError(err, 'list', 'checkInLogs'));
+
+      // 5. Listen to Global Admin Session Epoch (forces immediate logout on other devices when revoked)
+      onSnapshot(doc(db, 'events', 'evt_alas_cerita_2026'), (snapshot) => {
+        if (!snapshot.exists()) return;
+        const data = snapshot.data() as { adminSessionEpoch?: number };
+        if (typeof data.adminSessionEpoch === 'number' && data.adminSessionEpoch > this.cloudAdminEpoch) {
+          this.cloudAdminEpoch = data.adminSessionEpoch;
+          const localEpoch = Number(sessionStorage.getItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH) || 0);
+          if (localEpoch > 0 && localEpoch < this.cloudAdminEpoch) {
+            sessionStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION_USER);
+            sessionStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH);
+          }
+          this.notify();
+        }
+      }, (err) => logFirestoreError(err, 'get', 'events/evt_alas_cerita_2026'));
     } catch (e) {
       console.warn('Firestore sync setup failed, operating on local cache:', e);
     }
@@ -198,9 +219,8 @@ class StorageService {
     if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
       safeSetLocalStorage(STORAGE_KEYS.USERS, INITIAL_USERS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID)) {
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_cust');
-    }
+    // Always enforce customer default in persistent localStorage so legacy saved admin sessions are logged out
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_cust');
     if (!localStorage.getItem(STORAGE_KEYS.LOGS)) {
       safeSetLocalStorage(STORAGE_KEYS.LOGS, isCleared ? [] : INITIAL_LOGS);
     }
@@ -375,13 +395,78 @@ class StorageService {
 
   public getCurrentUser(): User {
     const users = this.getUsers();
-    const currentId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || 'usr_cust';
-    return users.find((u) => u.id === currentId) || users.find((u) => u.role === 'customer') || users[0];
+    const customerFallback = users.find((u) => u.role === 'customer') || users[0];
+
+    try {
+      const sessionUserId = sessionStorage.getItem(STORAGE_KEYS.ADMIN_SESSION_USER);
+      const sessionEpoch = Number(sessionStorage.getItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH) || 0);
+      const minRequiredEpoch = Math.max(MIN_VALID_ADMIN_EPOCH, this.cloudAdminEpoch);
+
+      if (sessionUserId && sessionUserId !== 'usr_cust' && sessionEpoch >= minRequiredEpoch) {
+        const matched = users.find((u) => u.id === sessionUserId);
+        if (matched && matched.role !== 'customer') {
+          return matched;
+        }
+      }
+    } catch {
+      // sessionStorage unavailable -> fallback to customer
+    }
+
+    return customerFallback;
   }
 
   public setCurrentUser(userId: string) {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, userId);
+    if (typeof window !== 'undefined') {
+      if (!userId || userId === 'usr_cust') {
+        sessionStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION_USER);
+        sessionStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH);
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_cust');
+      } else {
+        const newEpoch = Math.max(Date.now(), MIN_VALID_ADMIN_EPOCH, this.cloudAdminEpoch + 1);
+        this.cloudAdminEpoch = newEpoch;
+        sessionStorage.setItem(STORAGE_KEYS.ADMIN_SESSION_USER, userId);
+        sessionStorage.setItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH, String(newEpoch));
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_cust');
+
+        // Immediately invalidate any other older admin sessions active across other browsers/devices
+        setDoc(
+          doc(db, 'events', 'evt_alas_cerita_2026'),
+          { adminSessionEpoch: newEpoch },
+          { merge: true }
+        ).catch((err) => logFirestoreError(err, 'write', 'events/evt_alas_cerita_2026'));
+      }
+    }
     this.notify();
+  }
+
+  public async revokeOtherAdminSessions(): Promise<{ success: boolean; message: string }> {
+    const current = this.getCurrentUser();
+    const newEpoch = Math.max(Date.now(), MIN_VALID_ADMIN_EPOCH, this.cloudAdminEpoch + 1);
+    this.cloudAdminEpoch = newEpoch;
+
+    if (typeof window !== 'undefined' && current.role !== 'customer') {
+      sessionStorage.setItem(STORAGE_KEYS.ADMIN_SESSION_USER, current.id);
+      sessionStorage.setItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH, String(newEpoch));
+    }
+
+    try {
+      await setDoc(
+        doc(db, 'events', 'evt_alas_cerita_2026'),
+        { adminSessionEpoch: newEpoch },
+        { merge: true }
+      );
+      this.notify();
+      return {
+        success: true,
+        message: 'Seluruh sesi login admin di perangkat atau browser lain berhasil dikeluarkan (logout paksa).',
+      };
+    } catch (err) {
+      logFirestoreError(err, 'write', 'events/evt_alas_cerita_2026');
+      return {
+        success: false,
+        message: 'Gagal mengirim perintah logout ke server. Periksa koneksi internet Anda.',
+      };
+    }
   }
 
   // --- Events ---

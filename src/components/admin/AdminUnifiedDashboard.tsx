@@ -19,7 +19,8 @@ import {
   RotateCcw,
   AlertTriangle,
   CheckCircle2,
-  X
+  X,
+  UserX
 } from 'lucide-react';
 
 interface AdminUnifiedDashboardProps {
@@ -95,6 +96,19 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
     }
   };
 
+  const handleRevokeOtherAdmins = async () => {
+    setIsProcessingDb(true);
+    try {
+      const res = await storageService.revokeOtherAdminSessions();
+      setDbFeedback(res.message);
+    } catch {
+      setDbFeedback('Gagal mengeluarkan sesi admin lain.');
+    } finally {
+      setIsProcessingDb(false);
+      setTimeout(() => setDbFeedback(null), 5000);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-20">
       {/* Top Control Header */}
@@ -144,8 +158,19 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
 
             <button
               type="button"
+              onClick={handleRevokeOtherAdmins}
+              disabled={isProcessingDb}
+              className="px-3.5 py-2.5 bg-amber-950/80 hover:bg-amber-900/90 text-amber-200 border border-amber-400/50 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap min-h-[40px] disabled:opacity-60"
+              title="Paksa logout seluruh admin yang sedang masuk di perangkat atau browser lain"
+            >
+              <UserX className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span>Keluarkan Admin Lain</span>
+            </button>
+
+            <button
+              type="button"
               onClick={onLogoutToPublic}
-              className="col-span-2 sm:col-span-1 px-4 py-2.5 bg-[#2d1428] hover:bg-[#3a1a34] text-pink-200 hover:text-white border border-pink-500/40 text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap min-h-[40px]"
+              className="px-4 py-2.5 bg-[#2d1428] hover:bg-[#3a1a34] text-pink-200 hover:text-white border border-pink-500/40 text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap min-h-[40px]"
             >
               <LogOut className="w-3.5 h-3.5 text-rose-400 shrink-0" />
               <span>Keluar ke Publik</span>
