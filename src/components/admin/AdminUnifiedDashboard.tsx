@@ -15,9 +15,6 @@ import {
   FileText,
   LogOut,
   Receipt,
-  Trash2,
-  RotateCcw,
-  AlertTriangle,
   CheckCircle2,
   X,
   UserX
@@ -54,8 +51,6 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
     'scanner' | 'payments' | 'tickets' | 'helpdesk' | 'reports' | 'logs'
   >('payments');
 
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [showClearModal, setShowClearModal] = useState(false);
   const [isProcessingDb, setIsProcessingDb] = useState(false);
   const [dbFeedback, setDbFeedback] = useState<string | null>(null);
 
@@ -67,34 +62,6 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
   const pendingVerifications = bookings.filter(
     (b) => b.verificationStatus === 'pending_verification' || !b.verificationStatus
   ).length;
-
-  const handleConfirmResetInitial = async () => {
-    setIsProcessingDb(true);
-    try {
-      const res = await storageService.resetAllData();
-      setDbFeedback(res.message);
-      setShowResetModal(false);
-    } catch {
-      setDbFeedback('Gagal mengembalikan database ke data awal.');
-    } finally {
-      setIsProcessingDb(false);
-      setTimeout(() => setDbFeedback(null), 5000);
-    }
-  };
-
-  const handleConfirmClearSimulation = async () => {
-    setIsProcessingDb(true);
-    try {
-      const res = await storageService.clearAllSimulationData();
-      setDbFeedback(res.message);
-      setShowClearModal(false);
-    } catch {
-      setDbFeedback('Gagal membersihkan data simulasi.');
-    } finally {
-      setIsProcessingDb(false);
-      setTimeout(() => setDbFeedback(null), 5000);
-    }
-  };
 
   const handleRevokeOtherAdmins = async () => {
     setIsProcessingDb(true);
@@ -129,32 +96,13 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
                 Dashboard Validasi Gate &amp; Verifikasi Pembayaran
               </h1>
               <p className="text-xs text-stone-300 mt-0.5 line-clamp-2">
-                Kelola bukti transfer (QRIS, ShopeePay, BRI), biodata peserta, cetak E-Ticket, kontrol database, dan gate scanner.
+                Kelola bukti transfer (QRIS, ShopeePay, BRI), biodata peserta, cetak E-Ticket, kontrol sesi admin, dan gate scanner.
               </p>
             </div>
           </div>
 
-          {/* Admin Action Controls: Reset Awal, Hapus Simulasi, Keluar */}
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => setShowResetModal(true)}
-              className="px-3.5 py-2.5 bg-[#0e2218] hover:bg-[#163324] text-emerald-200 border border-emerald-400/40 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap min-h-[40px]"
-              title="Kembalikan seluruh database ke data contoh awal"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
-              <span>Reset Data Awal</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowClearModal(true)}
-              className="px-3.5 py-2.5 bg-rose-950/75 hover:bg-rose-900/90 text-rose-200 border border-rose-500/50 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap min-h-[40px]"
-              title="Kosongkan seluruh data simulasi agar bersih untuk produksi"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-              <span>Hapus Simulasi</span>
-            </button>
+          {/* Admin Action Controls: Keluarkan Admin Lain & Keluar ke Publik */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
 
             <button
               type="button"
@@ -375,92 +323,6 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
           />
         )}
       </div>
-
-      {/* Modal: Konfirmasi Reset Database ke Data Awal */}
-      {showResetModal && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="w-full max-w-md bg-[#1c0f1c] border-2 border-emerald-400/50 rounded-3xl p-6 shadow-2xl space-y-4 text-left">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-950/80 border border-emerald-500/60 flex items-center justify-center text-emerald-300">
-              <RotateCcw className="w-6 h-6" />
-            </div>
-
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-emerald-300 block">
-                PENGEMBALIAN DATA CONTOH
-              </span>
-              <h3 className="text-lg font-black text-white">
-                Reset Database ke Data Awal?
-              </h3>
-              <p className="text-xs text-stone-300 leading-relaxed">
-                Tindakan ini akan mengembalikan transaksi, daftar peserta contoh, kuota paket, dan log gate di penyimpanan lokal serta Cloud Firestore ke kondisi contoh awal.
-              </p>
-            </div>
-
-            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowResetModal(false)}
-                disabled={isProcessingDb}
-                className="px-4 py-2.5 bg-[#251323] hover:bg-[#341a32] text-stone-300 hover:text-white border border-pink-500/30 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmResetInitial}
-                disabled={isProcessingDb}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-600/25 flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>{isProcessingDb ? 'Mereset Database...' : 'Ya, Reset ke Data Awal'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Konfirmasi Hapus Semua Data Simulasi */}
-      {showClearModal && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="w-full max-w-lg bg-[#1c0f1c] border-2 border-rose-500/50 rounded-3xl p-6 shadow-2xl space-y-4 text-left">
-            <div className="w-12 h-12 rounded-2xl bg-rose-950/80 border border-rose-600/70 flex items-center justify-center text-rose-300">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-
-            <div className="space-y-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-rose-300 block">
-                PEMBERSIHAN DATA SIMULASI UNTUK PRODUKSI
-              </span>
-              <h3 className="text-lg sm:text-xl font-black text-white">
-                Hapus Semua Data Simulasi &amp; Kosongkan Dashboard?
-              </h3>
-              <p className="text-xs text-stone-200 leading-relaxed">
-                Seluruh transaksi uji coba, e-ticket contoh, dan log check-in simulasi akan dihapus bersih dari sistem &amp; Cloud Firestore, sementara kuota tiket dikembalikan penuh (Single: 120, Couple: 70, Circle: 50).
-              </p>
-            </div>
-
-            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowClearModal(false)}
-                disabled={isProcessingDb}
-                className="px-4 py-2.5 bg-[#251323] hover:bg-[#341a32] text-stone-300 hover:text-white border border-pink-500/30 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmClearSimulation}
-                disabled={isProcessingDb}
-                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>{isProcessingDb ? 'Membersihkan...' : 'Ya, Hapus Semua Simulasi'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

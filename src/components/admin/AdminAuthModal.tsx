@@ -49,8 +49,8 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
     }
 
     if (
-      (cleanUser === 'alasceritaeo' && cleanPass === 'alcer5desember') ||
-      (cleanUser === 'admin@alascerita.id' && cleanPass === 'alcer5desember')
+      (cleanUser === 'alasceritaeo' && cleanPass === 'adminalcer@') ||
+      (cleanUser === 'admin@alascerita.id' && cleanPass === 'adminalcer@')
     ) {
       setUsername('');
       setPassword('');
@@ -64,7 +64,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
         u.email.toLowerCase() === cleanUser ||
         u.name.toLowerCase() === cleanUser
     );
-    if (staffMatch && cleanPass === 'alcer5desember') {
+    if (staffMatch && cleanPass === 'adminalcer@') {
       setUsername('');
       setPassword('');
       onSuccessLogin(staffMatch);

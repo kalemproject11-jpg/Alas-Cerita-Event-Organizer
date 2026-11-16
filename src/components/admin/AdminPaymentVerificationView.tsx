@@ -56,7 +56,6 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
   // Simulation cleanup & individual deletion state
   const [confirmDeleteBooking, setConfirmDeleteBooking] = useState<Booking | null>(null);
   const [confirmDeleteTicket, setConfirmDeleteTicket] = useState<IssuedTicket | null>(null);
-  const [showConfirmClearAll, setShowConfirmClearAll] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const currentEvent = events[0] || {
@@ -161,20 +160,6 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
     } finally {
       setIsDeleting(false);
       setTimeout(() => setFeedbackMessage(null), 4000);
-    }
-  };
-
-  const executeClearAllSimulation = async () => {
-    setIsDeleting(true);
-    try {
-      const res = await storageService.clearAllSimulationData();
-      setFeedbackMessage(res.message);
-      setShowConfirmClearAll(false);
-    } catch (err) {
-      setFeedbackMessage('Gagal membersihkan data simulasi.');
-    } finally {
-      setIsDeleting(false);
-      setTimeout(() => setFeedbackMessage(null), 5000);
     }
   };
 
@@ -919,62 +904,6 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Tiket'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Confirmation Modal: Clear ALL Simulation Data */}
-      {showConfirmClearAll && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="w-full max-w-lg bg-[#1c0f1c] border-2 border-pink-500/50 rounded-3xl p-6 shadow-2xl space-y-4 text-left">
-            <div className="w-12 h-12 rounded-2xl bg-rose-950/80 border border-rose-600/70 flex items-center justify-center text-rose-300">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-
-            <div className="space-y-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-pink-300 bg-pink-950/70 border border-pink-500/60 px-2.5 py-0.5 rounded-full inline-block">
-                PEMBERSIHAN DATA SIMULASI UNTUK LIVE PRODUKSI
-              </span>
-              <h3 className="text-xl font-black text-white">
-                Hapus Semua Data Simulasi &amp; Reset ke Bersih?
-              </h3>
-              <p className="text-xs text-stone-200 leading-relaxed">
-                Tindakan ini akan menghapus <strong>seluruh data transaksi simulasi, tiket uji coba, dan riwayat scan ganda</strong> dari sistem dan Cloud Firestore.
-              </p>
-              <div className="p-3 bg-[#170a16] rounded-xl border border-pink-500/25 space-y-1.5 text-xs">
-                <span className="font-bold text-emerald-300 block">Kondisi Setelah Dihapus:</span>
-                <ul className="list-disc list-inside space-y-1 text-stone-300 text-[11px]">
-                  <li>Total Transaksi: <strong>0 Transaksi</strong> (kosong)</li>
-                  <li>Total Peserta: <strong>0 Orang</strong> (kosong)</li>
-                  <li>Kuota Tiket Single: <strong>120 Tersedia</strong> (penuh)</li>
-                  <li>Kuota Tiket Couple: <strong>70 Tersedia</strong> (penuh)</li>
-                  <li>Kuota Tiket Circle: <strong>50 Tersedia</strong> (penuh)</li>
-                </ul>
-              </div>
-              <p className="text-[11px] text-pink-300/80">
-                * Setelah dibersihkan, website siap 100% menerima pembayaran dan pendaftaran asli dari masyarakat umum.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowConfirmClearAll(false)}
-                disabled={isDeleting}
-                className="px-4 py-2.5 bg-[#251323] hover:bg-[#341a32] text-stone-300 hover:text-white border border-pink-500/30 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={executeClearAllSimulation}
-                disabled={isDeleting}
-                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-rose-950/30 flex items-center gap-1.5 cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>{isDeleting ? 'Membersihkan Database...' : 'Ya, Bersihkan Seluruh Data Simulasi'}</span>
               </button>
             </div>
           </div>
