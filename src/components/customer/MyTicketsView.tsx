@@ -140,7 +140,18 @@ export const MyTicketsView: React.FC<MyTicketsViewProps> = ({
                       <div className="p-2.5 bg-gradient-to-r from-pink-950/60 to-emerald-950/60 border border-emerald-500/40 rounded-xl text-[11px] text-emerald-200 leading-relaxed flex items-start gap-2">
                         <Clock className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                         <span>
-                          Tiket sedang dalam proses verifikasi pembayaran. E-Ticket resmi akan dikirimkan ke email <strong className="text-white">{ticket.attendeeEmail}</strong> dalam kurun waktu 1 × 24 jam.
+                          Tiket sedang dalam proses verifikasi pembayaran. Silakan konfirmasi juga ke WA Business CP{' '}
+                          <a
+                            href={`https://wa.me/6281936553249?text=${encodeURIComponent(
+                              `Halo Admin Alas Cerita, saya ingin konfirmasi pembayaran tiket atas nama ${ticket.attendeeName} (${ticket.ticketNumber}). Terima kasih.`
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono font-bold text-pink-300 underline hover:text-pink-200"
+                          >
+                            081936553249
+                          </a>
+                          . E-Ticket resmi akan dikirimkan ke email <strong className="text-white">{ticket.attendeeEmail}</strong> dalam kurun waktu 1 × 24 jam.
                         </span>
                       </div>
                     )}

@@ -4,11 +4,13 @@ import {
   Lock,
   LayoutDashboard,
   LogOut,
+  Receipt,
 } from 'lucide-react';
 
 interface HeaderProps {
   currentUser: User;
   activeTab: string;
+  myPurchaseCount?: number;
   onSelectTab: (tab: string) => void;
   onOpenAdminLogin: () => void;
   onLogoutAdmin: () => void;
@@ -17,6 +19,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   currentUser,
   activeTab,
+  myPurchaseCount = 0,
   onSelectTab,
   onOpenAdminLogin,
   onLogoutAdmin,
@@ -91,15 +94,43 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={onOpenAdminLogin}
-              className="px-3.5 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 min-h-[38px]"
-            >
-              <Lock className="w-3.5 h-3.5 shrink-0" />
-              <span className="sm:hidden">Admin</span>
-              <span className="hidden sm:inline">Portal Admin &amp; Gate</span>
-            </button>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => onSelectTab(activeTab === 'history' ? 'catalog' : 'history')}
+                className={`px-2.5 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 min-h-[38px] border ${
+                  activeTab === 'history'
+                    ? 'bg-pink-500 text-white border-pink-400 shadow-md shadow-pink-500/25'
+                    : 'bg-[#251323] hover:bg-[#341a32] text-pink-200 border-pink-500/35'
+                }`}
+                title="Lihat riwayat pembelian, bukti bayar, dan status verifikasi di HP ini"
+              >
+                <Receipt className="w-3.5 h-3.5 shrink-0" />
+                <span className="sm:hidden">Riwayat</span>
+                <span className="hidden sm:inline">Riwayat Pembelian</span>
+                {myPurchaseCount > 0 && (
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black ${
+                      activeTab === 'history'
+                        ? 'bg-white text-pink-600'
+                        : 'bg-emerald-500 text-white'
+                    }`}
+                  >
+                    {myPurchaseCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={onOpenAdminLogin}
+                className="px-3 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 min-h-[38px]"
+              >
+                <Lock className="w-3.5 h-3.5 shrink-0" />
+                <span className="sm:hidden">Admin</span>
+                <span className="hidden sm:inline">Portal Admin &amp; Gate</span>
+              </button>
+            </div>
           )}
         </div>
       </div>

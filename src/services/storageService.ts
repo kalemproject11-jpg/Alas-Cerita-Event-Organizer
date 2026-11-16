@@ -17,6 +17,8 @@ const STORAGE_KEYS = {
   LOGS: 'eventpass_check_in_logs_v3',
   RATE_LIMIT_ATTEMPTS: 'eventpass_supervisor_rate_limit_v3',
   SIMULATION_CLEARED: 'alas_cerita_simulation_cleared_v1',
+  MY_LOCAL_BOOKINGS: 'alas_cerita_my_local_bookings_v1',
+  MY_LOCAL_TICKETS: 'alas_cerita_my_local_tickets_v1',
 };
 
 // Safe alphanumeric character set for visual ticket_number (omits ambiguous 0, O, 1, I)
@@ -94,6 +96,7 @@ function safeSetLocalStorage(key: string, value: unknown) {
 class StorageService {
   private listeners: Set<() => void> = new Set();
   private isFirestoreSynced = false;
+  private hasFirestoreBookingsSync = false;
 
   // Canonical in-memory caches so large multi-phone datasets never hit localStorage 5MB limit
   private bookingsCache: Booking[] | null = null;
@@ -135,6 +138,7 @@ class StorageService {
 
       // 2. Listen to Bookings (real-time reflection from all smartphones -> single Admin Dashboard)
       onSnapshot(collection(db, 'bookings'), (snapshot) => {
+        this.hasFirestoreBookingsSync = true;
         const list: Booking[] = [];
         snapshot.forEach((d) => list.push(d.data() as Booking));
         list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -218,6 +222,8 @@ class StorageService {
       return { success: true, message: 'Database dikembalikan ke data awal.' };
     }
     localStorage.removeItem(STORAGE_KEYS.SIMULATION_CLEARED);
+    localStorage.removeItem(STORAGE_KEYS.MY_LOCAL_BOOKINGS);
+    localStorage.removeItem(STORAGE_KEYS.MY_LOCAL_TICKETS);
     this.ticketTypesCache = [...INITIAL_TICKET_TYPES];
     this.bookingsCache = [...INITIAL_BOOKINGS];
     this.issuedTicketsCache = [...INITIAL_ISSUED_TICKETS];
@@ -273,6 +279,8 @@ class StorageService {
     localStorage.setItem(STORAGE_KEYS.SIMULATION_CLEARED, 'true');
 
     // 2. Clear bookings, issuedTickets, logs in memory & localStorage
+    localStorage.removeItem(STORAGE_KEYS.MY_LOCAL_BOOKINGS);
+    localStorage.removeItem(STORAGE_KEYS.MY_LOCAL_TICKETS);
     this.bookingsCache = [];
     this.issuedTicketsCache = [];
     this.logsCache = [];
@@ -761,6 +769,73 @@ class StorageService {
     );
   }
 
+  // --- Device-Local Purchase History (Strictly scoped to THIS smartphone/browser) ---
+  private recordDevicePurchase(booking: Booking, tickets: IssuedTicket[]) {
+    if (typeof window === 'undefined') return;
+    try {
+      const rawBookings = localStorage.getItem(STORAGE_KEYS.MY_LOCAL_BOOKINGS);
+      const localBookings: Booking[] = rawBookings ? JSON.parse(rawBookings) : [];
+      const filteredBookings = localBookings.filter((b) => b.id !== booking.id);
+      filteredBookings.unshift(booking);
+      safeSetLocalStorage(STORAGE_KEYS.MY_LOCAL_BOOKINGS, filteredBookings);
+
+      const rawTickets = localStorage.getItem(STORAGE_KEYS.MY_LOCAL_TICKETS);
+      const localTickets: IssuedTicket[] = rawTickets ? JSON.parse(rawTickets) : [];
+      const newIds = new Set(tickets.map((t) => t.id));
+      const filteredTickets = localTickets.filter((t) => !newIds.has(t.id));
+      safeSetLocalStorage(STORAGE_KEYS.MY_LOCAL_TICKETS, [...tickets, ...filteredTickets]);
+    } catch {
+      // ignore local storage restriction
+    }
+  }
+
+  public getMyDevicePurchases(): Array<{ booking: Booking; tickets: IssuedTicket[] }> {
+    if (typeof window === 'undefined') return [];
+    try {
+      const rawBookings = localStorage.getItem(STORAGE_KEYS.MY_LOCAL_BOOKINGS);
+      const localBookings: Booking[] = rawBookings ? JSON.parse(rawBookings) : [];
+      if (localBookings.length === 0) return [];
+
+      const rawTickets = localStorage.getItem(STORAGE_KEYS.MY_LOCAL_TICKETS);
+      const localTickets: IssuedTicket[] = rawTickets ? JSON.parse(rawTickets) : [];
+
+      const liveBookings = this.getBookings();
+      const liveTickets = this.getIssuedTickets();
+      const liveBookingsMap = new Map(liveBookings.map((b) => [b.id, b]));
+
+      const results: Array<{ booking: Booking; tickets: IssuedTicket[] }> = [];
+
+      for (const localBkg of localBookings) {
+        const liveBkg = liveBookingsMap.get(localBkg.id);
+        // If cloud snapshot is synced and admin deleted this booking, omit it from device history
+        if (this.hasFirestoreBookingsSync && !liveBkg) {
+          continue;
+        }
+
+        const mergedBooking: Booking = liveBkg
+          ? {
+              ...localBkg,
+              ...liveBkg,
+              paymentProofUrl: liveBkg.paymentProofUrl || localBkg.paymentProofUrl,
+            }
+          : localBkg;
+
+        const matchingLiveTickets = liveTickets.filter((t) => t.bookingId === localBkg.id);
+        const matchingLocalTickets = localTickets.filter((t) => t.bookingId === localBkg.id);
+        const tickets = matchingLiveTickets.length > 0 ? matchingLiveTickets : matchingLocalTickets;
+
+        results.push({ booking: mergedBooking, tickets });
+      }
+
+      results.sort(
+        (a, b) => new Date(b.booking.createdAt).getTime() - new Date(a.booking.createdAt).getTime()
+      );
+      return results;
+    } catch {
+      return [];
+    }
+  }
+
   // --- Bookings & Concurrency Quota Hold (FR-BKG-02) ---
   public getBookings(): Booking[] {
     try {
@@ -1048,6 +1123,9 @@ class StorageService {
 
     this.ticketTypesCache = ticketTypes;
     safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, ticketTypes);
+
+    // Record this purchase exclusively inside THIS device's local history
+    this.recordDevicePurchase(booking, newIssued);
 
     this.pendingAttendeesMap.delete(booking.id);
     try {

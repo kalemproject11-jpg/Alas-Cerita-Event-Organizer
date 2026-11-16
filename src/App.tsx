@@ -8,6 +8,7 @@ import { CheckoutPaymentModal } from './components/customer/CheckoutPaymentModal
 import { ETicketModal } from './components/customer/ETicketModal';
 import { AdminAuthModal } from './components/admin/AdminAuthModal';
 import { AdminUnifiedDashboard } from './components/admin/AdminUnifiedDashboard';
+import { PurchaseHistoryView } from './components/customer/PurchaseHistoryView';
 import { Ticket, AlertCircle, X } from 'lucide-react';
 
 export default function App() {
@@ -17,9 +18,12 @@ export default function App() {
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>(() => storageService.getTicketTypes());
   const [bookings, setBookings] = useState<Booking[]>(() => storageService.getBookings());
   const [issuedTickets, setIssuedTickets] = useState<IssuedTicket[]>(() => storageService.getIssuedTickets());
+  const [myPurchases, setMyPurchases] = useState<Array<{ booking: Booking; tickets: IssuedTicket[] }>>(() =>
+    storageService.getMyDevicePurchases()
+  );
   const [logs, setLogs] = useState<CheckInLog[]>(() => storageService.getLogs());
 
-  // Active navigation: 'catalog' | 'admin_dashboard'
+  // Active navigation: 'catalog' | 'history' | 'admin_dashboard'
   const [activeTab, setActiveTab] = useState<string>('catalog');
 
   // Modals & notification state
@@ -40,6 +44,7 @@ export default function App() {
       setTicketTypes(storageService.getTicketTypes());
       setBookings(storageService.getBookings());
       setIssuedTickets(storageService.getIssuedTickets());
+      setMyPurchases(storageService.getMyDevicePurchases());
       setLogs(storageService.getLogs());
     });
     return () => unsubscribe();
@@ -84,12 +89,14 @@ export default function App() {
     }
   };
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = (goToHistory = false) => {
     setActiveBookingForPayment(null);
     setCustomerSuccessTicket(null);
 
     if (currentUser.role !== 'customer') {
       setActiveTab('admin_dashboard');
+    } else if (goToHistory) {
+      setActiveTab('history');
     }
   };
 
@@ -117,6 +124,7 @@ export default function App() {
       <Header
         currentUser={currentUser}
         activeTab={activeTab}
+        myPurchaseCount={myPurchases.length}
         onSelectTab={(tab) => {
           if (tab === 'admin_dashboard' && !isAdminOrStaff) {
             setShowAdminAuthModal(true);
@@ -159,6 +167,15 @@ export default function App() {
               setSelectedEventForDetail(evt);
               setPreferredTierId(tierId);
             }}
+          />
+        )}
+
+        {/* PUBLIC VIEW: Device-Local Purchase History & Verification Monitor */}
+        {activeTab === 'history' && (
+          <PurchaseHistoryView
+            purchases={myPurchases}
+            events={events}
+            onBackToCatalog={() => setActiveTab('catalog')}
           />
         )}
 

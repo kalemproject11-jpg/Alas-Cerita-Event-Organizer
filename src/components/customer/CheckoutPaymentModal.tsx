@@ -19,13 +19,14 @@ import {
   FileText,
   Image as ImageIcon,
   X,
-  Eye
+  Eye,
+  MessageCircle
 } from 'lucide-react';
 
 interface CheckoutPaymentModalProps {
   booking: Booking;
   event: Event;
-  onPaymentSuccess: () => void;
+  onPaymentSuccess: (goToHistory?: boolean) => void;
   onCancel: () => void;
 }
 
@@ -261,6 +262,59 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
               <p className="text-[11px] text-emerald-200/90 italic">
                 * Estimasi proses verifikasi dan pengiriman tiket digital adalah maksimal <strong>1 × 24 jam</strong> sejak bukti pembayaran diunggah.
               </p>
+
+              {/* WhatsApp Business CP Confirmation Instruction */}
+              <div className="pt-3 mt-1 border-t border-pink-500/25 space-y-2.5">
+                <div className="flex items-center gap-2 text-pink-300 font-bold text-xs font-mono">
+                  <MessageCircle className="w-4 h-4 text-pink-400 shrink-0" />
+                  <span>WAJIB KONFIRMASI VIA WHATSAPP BUSINESS CP</span>
+                </div>
+                <p className="text-xs text-stone-200 leading-relaxed">
+                  Seluruh pendaftar dimohon segera melakukan konfirmasi pendaftaran &amp; pembayaran ke nomor <strong>WhatsApp Business CP Alas Cerita</strong> berikut agar verifikasi dapat segera diproses:
+                </p>
+                <div className="p-3 bg-black/55 rounded-xl border border-emerald-400/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div>
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-pink-300 block">
+                      WhatsApp Business CP Resmi
+                    </span>
+                    <span className="text-sm sm:text-base font-black font-mono text-emerald-300 tabular-nums">
+                      0819-3655-3249
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleCopy('081936553249', 'wa_cp')}
+                      className="px-3 py-2 bg-[#251323] hover:bg-[#341a32] text-pink-200 border border-pink-500/35 rounded-xl text-[11px] font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {copiedText === 'wa_cp' ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Tersalin</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Salin No. WA</span>
+                        </>
+                      )}
+                    </button>
+
+                    <a
+                      href={`https://wa.me/6281936553249?text=${encodeURIComponent(
+                        `Halo Admin Alas Cerita, saya ingin konfirmasi pembayaran pendaftaran:\n• Nama Pemesan: ${booking.customerName}\n• No. Invoice: ${booking.invoiceCode}\n• Email: ${booking.customerEmail}\n• Total Tagihan: Rp${booking.totalAmount.toLocaleString('id-ID')}\n• Metode Bayar: ${selectedMethod.toUpperCase()}\n\nBukti transfer sudah saya unggah di web. Mohon bantuannya untuk verifikasi. Terima kasih!`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 bg-pink-500 hover:bg-pink-400 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-pink-500/25 inline-flex items-center justify-center gap-1.5"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Konfirmasi WA CP</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Transaction Summary Card */}
@@ -298,12 +352,35 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
               </div>
             </div>
 
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-lg mx-auto">
+            <div className="pt-2 space-y-2.5 max-w-lg mx-auto">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <a
+                  href={`https://wa.me/6281936553249?text=${encodeURIComponent(
+                    `Halo Admin Alas Cerita, saya ingin konfirmasi pembayaran pendaftaran:\n• Nama Pemesan: ${booking.customerName}\n• No. Invoice: ${booking.invoiceCode}\n• Email: ${booking.customerEmail}\n• Total Tagihan: Rp${booking.totalAmount.toLocaleString('id-ID')}\n• Metode Bayar: ${selectedMethod.toUpperCase()}\n\nBukti transfer sudah saya unggah di web. Mohon bantuannya untuk verifikasi. Terima kasih!`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3.5 bg-pink-500 hover:bg-pink-400 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-pink-500/25 inline-flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <MessageCircle className="w-4 h-4 shrink-0" />
+                  <span>Konfirmasi ke WA Business CP</span>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => onPaymentSuccess(true)}
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-600/25 inline-flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Pantau Status &amp; Bukti</span>
+                </button>
+              </div>
+
               <button
-                onClick={onPaymentSuccess}
-                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-600/25 inline-flex items-center justify-center gap-2 cursor-pointer"
+                type="button"
+                onClick={() => onPaymentSuccess(false)}
+                className="text-xs text-stone-400 hover:text-white underline transition-colors cursor-pointer"
               >
-                <span>Tutup &amp; Selesai</span>
+                Tutup &amp; Kembali ke Beranda
               </button>
             </div>
           </div>
