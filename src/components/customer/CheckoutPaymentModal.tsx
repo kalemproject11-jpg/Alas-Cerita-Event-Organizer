@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Booking, Event, PaymentMethod } from '../../types';
 import { storageService } from '../../services/storageService';
+import { verifyImageMagicBytes, sanitizeText } from '../../utils/security';
 import confetti from 'canvas-confetti';
 import {
   Clock,
@@ -147,6 +148,13 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
       return;
     }
 
+    const isGenuineImage = await verifyImageMagicBytes(file);
+    if (!isGenuineImage) {
+      setErrorMessage('File ditolak demi keamanan: unggah gambar asli berformat JPG, PNG, atau WEBP.');
+      e.target.value = '';
+      return;
+    }
+
     setIsCompressingImage(true);
     try {
       const compressed = await compressProofImage(file);
@@ -169,11 +177,12 @@ export const CheckoutPaymentModal: React.FC<CheckoutPaymentModalProps> = ({
 
     setIsProcessing(true);
     try {
+      const cleanSender = sanitizeText(senderAccountName, 120);
       const res = await storageService.completePayment(
         booking.id,
         selectedMethod,
         proofImage,
-        senderAccountName.trim() || booking.customerName
+        cleanSender || booking.customerName
       );
 
       if (res.success) {

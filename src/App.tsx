@@ -68,6 +68,38 @@ export default function App() {
     prevRoleRef.current = currentUser.role;
   }, [currentUser.role, activeTab]);
 
+  // Keep admin session activity fresh on interaction and auto-logout after 30 minutes of inactivity
+  useEffect(() => {
+    if (currentUser.role === 'customer') return;
+
+    let lastTouch = 0;
+    const handleActivity = () => {
+      const now = Date.now();
+      if (now - lastTouch > 15_000) {
+        lastTouch = now;
+        storageService.touchAdminSessionActivity();
+      }
+    };
+
+    const activityEvents: Array<keyof WindowEventMap> = ['mousedown', 'keydown', 'touchstart', 'scroll'];
+    activityEvents.forEach((evt) => window.addEventListener(evt, handleActivity, { passive: true }));
+
+    const idleCheckTimer = setInterval(() => {
+      const active = storageService.getCurrentUser();
+      if (active.role === 'customer') {
+        isSelfLogoutRef.current = true;
+        setCurrentUser(active);
+        setActiveTab('catalog');
+        setAppError('Sesi admin berakhir otomatis setelah 30 menit tidak ada aktivitas demi keamanan.');
+      }
+    }, 30_000);
+
+    return () => {
+      activityEvents.forEach((evt) => window.removeEventListener(evt, handleActivity));
+      clearInterval(idleCheckTimer);
+    };
+  }, [currentUser.role]);
+
   const handleAdminLoginSuccess = (adminUser: User) => {
     setAppError(null);
     storageService.setCurrentUser(adminUser.id);
@@ -192,11 +224,7 @@ export default function App() {
 
         {/* PUBLIC VIEW: Device-Local Purchase History & Verification Monitor */}
         {activeTab === 'history' && (
-          <PurchaseHistoryView
-            purchases={myPurchases}
-            events={events}
-            onBackToCatalog={() => setActiveTab('catalog')}
-          />
+          <PurchaseHistoryView purchases={myPurchases} />
         )}
 
         {/* ADMIN UNIFIED DASHBOARD */}

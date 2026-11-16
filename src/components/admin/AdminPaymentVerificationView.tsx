@@ -37,6 +37,7 @@ interface AdminPaymentVerificationViewProps {
   issuedTickets: IssuedTicket[];
   events: Event[];
   currentUser?: User;
+  highlightedBookingIds?: Set<string>;
 }
 
 export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationViewProps> = ({
@@ -44,6 +45,7 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
   issuedTickets,
   events,
   currentUser,
+  highlightedBookingIds,
 }) => {
   const [viewMode, setViewMode] = useState<'transactions' | 'attendees'>('transactions');
   const [searchQuery, setSearchQuery] = useState('');
@@ -307,15 +309,27 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
                 const relatedTickets = issuedTickets.filter((t) => t.bookingId === b.id);
                 const isPaid = b.paymentStatus === 'paid';
                 const isVerified = b.verificationStatus === 'verified';
+                const isNewlyArrived =
+                  Boolean(highlightedBookingIds?.has(b.id)) ||
+                  Date.now() - new Date(b.createdAt).getTime() <= 3 * 60 * 1000;
 
                 return (
                   <div
                     key={b.id}
-                    className="p-5 bg-[#221221]/95 border border-pink-500/25 rounded-3xl shadow-sm hover:border-pink-500/45 transition-all flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5"
+                    className={`p-5 bg-[#221221]/95 rounded-3xl shadow-sm transition-all flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 border ${
+                      isNewlyArrived
+                        ? 'border-emerald-400/75 ring-1 ring-emerald-400/35 shadow-emerald-500/10'
+                        : 'border-pink-500/25 hover:border-pink-500/45'
+                    }`}
                   >
                     {/* Left: Booking & Customer Info */}
                     <div className="space-y-2.5 min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
+                        {isNewlyArrived && (
+                          <span className="text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded-md bg-emerald-500 text-stone-950">
+                            BARU MASUK
+                          </span>
+                        )}
                         <span className="text-xs font-mono font-bold text-pink-200 bg-[#170a16] px-2.5 py-1 rounded-lg border border-pink-500/30">
                           {b.invoiceCode}
                         </span>

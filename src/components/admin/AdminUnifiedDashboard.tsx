@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Event, TicketType, Booking, IssuedTicket, CheckInLog } from '../../types';
 import { storageService } from '../../services/storageService';
 import { GateScanner } from '../gate/GateScanner';
@@ -17,7 +17,11 @@ import {
   Receipt,
   CheckCircle2,
   X,
-  UserX
+  UserX,
+  RefreshCw,
+  BellRing,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 
 interface AdminUnifiedDashboardProps {
@@ -33,6 +37,38 @@ interface AdminUnifiedDashboardProps {
   onOpenGateScannerWithTicket: (ticket: IssuedTicket) => void;
   onOpenConcurrencyDemo?: () => void;
   onLogoutToPublic: () => void;
+}
+
+function playNewRegistrantChime() {
+  if (typeof window === 'undefined') return;
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+
+    const playNote = (freq: number, startOffset: number, duration: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + startOffset);
+      gain.gain.setValueAtTime(0.001, now + startOffset);
+      gain.gain.exponentialRampToValueAtTime(0.14, now + startOffset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + startOffset + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + startOffset);
+      osc.stop(now + startOffset + duration);
+    };
+
+    playNote(587.33, 0, 0.16); // D5
+    playNote(880, 0.12, 0.28); // A5
+    setTimeout(() => {
+      ctx.close().catch(() => {});
+    }, 600);
+  } catch {
+    // Ignore audio context autoplay restrictions
+  }
 }
 
 export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
@@ -52,7 +88,80 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
   >('payments');
 
   const [isProcessingDb, setIsProcessingDb] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [dbFeedback, setDbFeedback] = useState<string | null>(null);
+  const [newlyArrivedIds, setNewlyArrivedIds] = useState<Set<string>>(() => new Set());
+  const [recentAlert, setRecentAlert] = useState<{
+    bookingId: string;
+    customerName: string;
+    invoiceCode: string;
+    attendeeCount: number;
+    packageLabel: string;
+  } | null>(null);
+
+  const knownBookingIdsRef = useRef<Set<string> | null>(null);
+  const defaultTitleRef = useRef<string>(typeof document !== 'undefined' ? document.title : '');
+
+  // Detect newly arrived bookings/registrants in real time from Firestore
+  useEffect(() => {
+    const currentIds = new Set(bookings.map((b) => b.id));
+    if (knownBookingIdsRef.current === null) {
+      knownBookingIdsRef.current = currentIds;
+      return;
+    }
+
+    const incomingNew = bookings.filter((b) => !knownBookingIdsRef.current!.has(b.id));
+    knownBookingIdsRef.current = currentIds;
+
+    if (incomingNew.length > 0) {
+      const latest = incomingNew[0];
+      const relatedTickets = issuedTickets.filter((t) => t.bookingId === latest.id);
+      const tier = ticketTypes.find((tt) => tt.id === latest.ticketTypeId);
+      const packageLabel =
+        relatedTickets[0]?.packageName ||
+        tier?.name ||
+        `${latest.quantity || 1} Paket`;
+
+      setNewlyArrivedIds((prev) => {
+        const next = new Set(prev);
+        incomingNew.forEach((b) => next.add(b.id));
+        return next;
+      });
+
+      setRecentAlert({
+        bookingId: latest.id,
+        customerName: latest.customerName,
+        invoiceCode: latest.invoiceCode,
+        attendeeCount: relatedTickets.length || latest.quantity || 1,
+        packageLabel,
+      });
+
+      if (soundEnabled) {
+        playNewRegistrantChime();
+      }
+
+      if (typeof document !== 'undefined') {
+        const originalTitle = defaultTitleRef.current || document.title;
+        document.title = `(${incomingNew.length} Pendaftar Baru!) ${originalTitle}`;
+        const restoreTimer = setTimeout(() => {
+          document.title = originalTitle;
+        }, 8000);
+        return () => clearTimeout(restoreTimer);
+      }
+    }
+  }, [bookings, issuedTickets, ticketTypes, soundEnabled]);
+
+  // Periodic active-tab server sync (25s) as a resilient safety net alongside Firestore onSnapshot
+  useEffect(() => {
+    void storageService.syncFromServer(true);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        void storageService.syncFromServer(false);
+      }
+    }, 25_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const totalSold = issuedTickets.length;
   const totalCheckedIn = issuedTickets.filter((t) => t.status === 'checked-in').length;
@@ -62,6 +171,21 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
   const pendingVerifications = bookings.filter(
     (b) => b.verificationStatus === 'pending_verification' || !b.verificationStatus
   ).length;
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const ok = await storageService.syncFromServer(true);
+      setDbFeedback(
+        ok
+          ? 'Data pendaftar dan kuota terbaru berhasil diperbarui langsung dari server.'
+          : 'Gagal terhubung ke server. Menampilkan data terakhir yang tersimpan.'
+      );
+    } finally {
+      setIsRefreshing(false);
+      setTimeout(() => setDbFeedback(null), 4000);
+    }
+  };
 
   const handleRevokeOtherAdmins = async () => {
     setIsProcessingDb(true);
@@ -96,13 +220,41 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
                 Dashboard Validasi Gate &amp; Verifikasi Pembayaran
               </h1>
               <p className="text-xs text-stone-300 mt-0.5 line-clamp-2">
-                Kelola bukti transfer (QRIS, ShopeePay, BRI), biodata peserta, cetak E-Ticket, kontrol sesi admin, dan gate scanner.
+                Pembaruan pendaftar berjalan otomatis secara realtime. Kelola bukti transfer, biodata peserta, cetak E-Ticket, dan gate scanner.
               </p>
             </div>
           </div>
 
-          {/* Admin Action Controls: Keluarkan Admin Lain & Keluar ke Publik */}
+          {/* Admin Action Controls */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="px-3.5 py-2.5 bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-200 border border-emerald-500/50 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap min-h-[40px] disabled:opacity-60"
+              title="Ambil data pendaftar terbaru dari server sekarang"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-emerald-300 shrink-0 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span>{isRefreshing ? 'Menyegarkan...' : 'Segarkan Data'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSoundEnabled((prev) => !prev)}
+              className={`px-3 py-2.5 border text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap min-h-[40px] ${
+                soundEnabled
+                  ? 'bg-pink-950/75 text-pink-200 border-pink-400/50 hover:bg-pink-900/80'
+                  : 'bg-[#221221] text-stone-400 border-stone-700 hover:text-stone-200'
+              }`}
+              title={soundEnabled ? 'Matikan suara notifikasi pendaftar baru' : 'Aktifkan suara notifikasi pendaftar baru'}
+            >
+              {soundEnabled ? (
+                <Volume2 className="w-3.5 h-3.5 text-pink-300 shrink-0" />
+              ) : (
+                <VolumeX className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+              )}
+              <span className="hidden sm:inline">{soundEnabled ? 'Suara Notif' : 'Notif Bisu'}</span>
+            </button>
 
             <button
               type="button"
@@ -158,7 +310,50 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
         </div>
       </section>
 
-      {/* Feedback Banner for Reset / Clear */}
+      {/* Instant Realtime New Registrant Alert Banner */}
+      {recentAlert && (
+        <div className="p-4 bg-gradient-to-r from-emerald-950/95 via-[#182920] to-pink-950/95 border-2 border-emerald-400/70 rounded-2xl text-white text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 shrink-0">
+              <BellRing className="w-4 h-4 animate-bounce" />
+            </div>
+            <div className="space-y-0.5">
+              <div className="font-black text-emerald-300 text-xs sm:text-sm">
+                Pendaftar Baru Masuk Secara Realtime!
+              </div>
+              <div className="text-stone-200">
+                <strong className="text-white">{recentAlert.customerName}</strong> ({recentAlert.invoiceCode}) memesan{' '}
+                <strong className="text-pink-300">Paket {recentAlert.packageLabel}</strong> ({recentAlert.attendeeCount} peserta).
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+            {activeSubTab !== 'payments' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSubTab('payments');
+                  setRecentAlert(null);
+                }}
+                className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-black rounded-xl text-xs transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Lihat di Verifikasi
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setRecentAlert(null)}
+              className="p-1.5 text-stone-300 hover:text-white rounded-lg hover:bg-white/10 cursor-pointer"
+              aria-label="Tutup pemberitahuan pendaftar baru"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Banner */}
       {dbFeedback && (
         <div className="p-3.5 bg-gradient-to-r from-pink-950/90 to-emerald-950/90 border border-emerald-400/50 rounded-2xl text-emerald-200 text-xs flex items-center justify-between gap-3 shadow-lg">
           <div className="flex items-center gap-2">
@@ -272,6 +467,7 @@ export const AdminUnifiedDashboard: React.FC<AdminUnifiedDashboardProps> = ({
             bookings={bookings}
             issuedTickets={issuedTickets}
             events={events}
+            highlightedBookingIds={newlyArrivedIds}
           />
         )}
 

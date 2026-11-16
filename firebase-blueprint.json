@@ -14,7 +14,8 @@
         "endTime": { "type": "string" },
         "posterUrl": { "type": "string" },
         "status": { "type": "string", "enum": ["published", "draft", "archived"] },
-        "organizer": { "type": "string" }
+        "organizer": { "type": "string" },
+        "adminSessionEpoch": { "type": "number" }
       },
       "required": ["title", "venue", "startTime", "endTime"]
     },
@@ -45,7 +46,13 @@
         "invoiceCode": { "type": "string" },
         "totalAmount": { "type": "number" },
         "paymentStatus": { "type": "string", "enum": ["pending", "paid", "expired", "failed"] },
+        "verificationStatus": { "type": "string", "enum": ["pending_verification", "verified", "rejected"] },
         "paymentMethod": { "type": "string" },
+        "paymentProofUrl": { "type": "string" },
+        "senderName": { "type": "string" },
+        "proofUploadedAt": { "type": "string" },
+        "verifiedAt": { "type": "string" },
+        "verifiedBy": { "type": "string" },
         "ticketTypeId": { "type": "string" },
         "quantity": { "type": "number" },
         "createdAt": { "type": "string" }
@@ -69,6 +76,9 @@
         "ticketNumber": { "type": "string" },
         "qrToken": { "type": "string" },
         "status": { "type": "string", "enum": ["valid", "checked-in", "revoked"] },
+        "verificationStatus": { "type": "string", "enum": ["pending_verification", "verified"] },
+        "verifiedAt": { "type": "string" },
+        "verifiedBy": { "type": "string" },
         "checkedInAt": { "type": "string" },
         "checkedInBy": { "type": "string" },
         "gateName": { "type": "string" },

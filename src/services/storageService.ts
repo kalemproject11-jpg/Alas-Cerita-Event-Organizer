@@ -1,11 +1,21 @@
-import { User, Event, TicketType, Booking, IssuedTicket, CheckInLog, CheckInResult, PaymentMethod } from '../types';
+import { User, Event, TicketType, Booking, IssuedTicket, CheckInLog, CheckInResult, PaymentMethod, UserRole } from '../types';
 import { INITIAL_USERS, INITIAL_EVENTS, INITIAL_TICKET_TYPES, INITIAL_BOOKINGS, INITIAL_ISSUED_TICKETS, INITIAL_LOGS, ALAS_CERITA_PERKS } from '../data/mockData';
 import { db, auth } from '../firebase';
-import { collection, doc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, runTransaction } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, getDocs, getDocsFromServer, onSnapshot, runTransaction } from 'firebase/firestore';
+import {
+  computeSessionBindingToken,
+  sanitizeEmail,
+  sanitizePhone,
+  sanitizeText,
+} from '../utils/security';
 
 export const SINGLE_PROMO_LIMIT = 13;
 export const SINGLE_PROMO_PRICE = 70000;
 export const SINGLE_REGULAR_PRICE = 80000;
+
+const ADMIN_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes inactivity timeout
+const ADMIN_LOGIN_MAX_ATTEMPTS = 5;
+const ADMIN_LOGIN_LOCKOUT_MS = 3 * 60 * 1000; // 3 minutes lockout
 
 const STORAGE_KEYS = {
   USERS: 'eventpass_users_v3',
@@ -21,10 +31,13 @@ const STORAGE_KEYS = {
   MY_LOCAL_TICKETS: 'alas_cerita_my_local_tickets_v1',
   ADMIN_SESSION_USER: 'alas_cerita_admin_session_user_v1',
   ADMIN_SESSION_EPOCH: 'alas_cerita_admin_session_epoch_v1',
+  ADMIN_SESSION_SIG: 'alas_cerita_admin_sig_v1',
+  ADMIN_LAST_ACTIVE: 'alas_cerita_admin_last_active_v1',
+  ADMIN_LOGIN_GUARD: 'alas_cerita_admin_login_guard_v1',
 };
 
-// Every pre-existing admin session created prior to 2026-11-16T15:47:00Z is automatically invalidated
-const MIN_VALID_ADMIN_EPOCH = Date.UTC(2026, 10, 16, 15, 47, 0);
+// Every pre-existing admin session created prior to this credential rotation is automatically invalidated
+const MIN_VALID_ADMIN_EPOCH = Date.UTC(2026, 10, 16, 16, 38, 0);
 
 // Safe alphanumeric character set for visual ticket_number (omits ambiguous 0, O, 1, I)
 const TICKET_NUMBER_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -103,6 +116,8 @@ class StorageService {
   private isFirestoreSynced = false;
   private hasFirestoreBookingsSync = false;
   private cloudAdminEpoch = MIN_VALID_ADMIN_EPOCH;
+  private lastServerSyncAt = 0;
+  private activeServerSync: Promise<boolean> | null = null;
 
   // Canonical in-memory caches so large multi-phone datasets never hit localStorage 5MB limit
   private bookingsCache: Booking[] | null = null;
@@ -118,6 +133,143 @@ class StorageService {
     this.initFirestoreSync();
   }
 
+  private sortBookingsNewestFirst(list: Booking[]): Booking[] {
+    return [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  private sortIssuedTicketsNewestFirst(list: IssuedTicket[], bookingsRef?: Booking[]): IssuedTicket[] {
+    const bookingTimeMap = new Map<string, number>();
+    (bookingsRef || this.bookingsCache || []).forEach((b) => {
+      const ts = new Date(b.createdAt).getTime();
+      if (!Number.isNaN(ts)) bookingTimeMap.set(b.id, ts);
+    });
+
+    const getTicketTimestamp = (t: IssuedTicket): number => {
+      if (t.bookingId && bookingTimeMap.has(t.bookingId)) {
+        return bookingTimeMap.get(t.bookingId)!;
+      }
+      const parsedIdTs = Number(t.id.split('_')[1]);
+      return Number.isFinite(parsedIdTs) ? parsedIdTs : 0;
+    };
+
+    return [...list].sort((a, b) => {
+      const diff = getTicketTimestamp(b) - getTicketTimestamp(a);
+      if (diff !== 0) return diff;
+      return (a.packageMemberIndex || 1) - (b.packageMemberIndex || 1);
+    });
+  }
+
+  private applyServerTicketTypes(rawList: TicketType[], isCleared: boolean) {
+    if (rawList.length > 0) {
+      this.ticketTypesCache = rawList;
+      this.reconcileTicketTypesWithActualData(true);
+      this.notify();
+    } else if (!isCleared) {
+      INITIAL_TICKET_TYPES.forEach((tt) => {
+        setDoc(doc(db, 'ticketTypes', tt.id), sanitizeForFirestore(tt)).catch((err) =>
+          logFirestoreError(err, 'write', `ticketTypes/${tt.id}`)
+        );
+      });
+    }
+  }
+
+  private applyServerBookings(rawList: Booking[]) {
+    this.hasFirestoreBookingsSync = true;
+    const sorted = this.sortBookingsNewestFirst(rawList);
+    const reconciled = this.reconcileSingleBookingPrices(sorted, true);
+    this.bookingsCache = reconciled;
+    if (this.issuedTicketsCache) {
+      this.issuedTicketsCache = this.sortIssuedTicketsNewestFirst(this.issuedTicketsCache, reconciled);
+    }
+    if (this.getCurrentUser().role !== 'customer') {
+      safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, reconciled);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.BOOKINGS);
+    }
+    this.reconcileTicketTypesWithActualData(true);
+    this.notify();
+  }
+
+  private applyServerIssuedTickets(rawList: IssuedTicket[]) {
+    const sorted = this.sortIssuedTicketsNewestFirst(rawList);
+    this.issuedTicketsCache = sorted;
+    if (this.getCurrentUser().role !== 'customer') {
+      safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, sorted);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.ISSUED_TICKETS);
+    }
+    this.reconcileTicketTypesWithActualData(true);
+    this.notify();
+  }
+
+  private applyServerLogs(rawList: CheckInLog[]) {
+    const sorted = [...rawList].sort(
+      (a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime()
+    );
+    const sliced = sorted.slice(0, 150);
+    this.logsCache = sliced;
+    if (this.getCurrentUser().role !== 'customer') {
+      safeSetLocalStorage(STORAGE_KEYS.LOGS, sliced);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.LOGS);
+    }
+    this.notify();
+  }
+
+  /**
+   * Forces an immediate read from Firestore Server (bypasses local cache)
+   * so admin dashboards instantly catch new registrants after tab wake-up or network reconnect.
+   */
+  public async syncFromServer(force = false): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+    const now = Date.now();
+    if (!force && now - this.lastServerSyncAt < 6_000) {
+      return true;
+    }
+    if (this.activeServerSync) {
+      return this.activeServerSync;
+    }
+
+    const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
+
+    this.activeServerSync = (async () => {
+      try {
+        const [ttSnap, bkgSnap, tktSnap, logSnap] = await Promise.all([
+          getDocsFromServer(collection(db, 'ticketTypes')),
+          getDocsFromServer(collection(db, 'bookings')),
+          getDocsFromServer(collection(db, 'issuedTickets')),
+          getDocsFromServer(collection(db, 'checkInLogs')),
+        ]);
+
+        const ttList: TicketType[] = [];
+        ttSnap.forEach((d) => ttList.push(d.data() as TicketType));
+
+        const bkgList: Booking[] = [];
+        bkgSnap.forEach((d) => bkgList.push(d.data() as Booking));
+
+        const tktList: IssuedTicket[] = [];
+        tktSnap.forEach((d) => tktList.push(d.data() as IssuedTicket));
+
+        const logList: CheckInLog[] = [];
+        logSnap.forEach((d) => logList.push(d.data() as CheckInLog));
+
+        this.lastServerSyncAt = Date.now();
+        this.applyServerBookings(bkgList);
+        this.applyServerIssuedTickets(tktList);
+        this.applyServerTicketTypes(ttList, isCleared);
+        this.applyServerLogs(logList);
+        return true;
+      } catch (err) {
+        logFirestoreError(err, 'list', 'syncFromServer');
+        return false;
+      } finally {
+        this.activeServerSync = null;
+      }
+    })();
+
+    return this.activeServerSync;
+  }
+
   private initFirestoreSync() {
     if (typeof window === 'undefined' || this.isFirestoreSynced) return;
     this.isFirestoreSynced = true;
@@ -126,75 +278,101 @@ class StorageService {
       const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
 
       // 1. Listen to Ticket Types and live quotas
-      onSnapshot(collection(db, 'ticketTypes'), (snapshot) => {
-        if (!snapshot.empty) {
+      onSnapshot(
+        collection(db, 'ticketTypes'),
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (snapshot.metadata.fromCache && snapshot.empty) return;
           const list: TicketType[] = [];
           snapshot.forEach((d) => list.push(d.data() as TicketType));
-          this.ticketTypesCache = list;
-          this.reconcileTicketTypesWithActualData(true);
-          this.notify();
-        } else if (!isCleared) {
-          INITIAL_TICKET_TYPES.forEach((tt) => {
-            setDoc(doc(db, 'ticketTypes', tt.id), sanitizeForFirestore(tt)).catch((err) =>
-              logFirestoreError(err, 'write', `ticketTypes/${tt.id}`)
-            );
-          });
-        }
-      }, (err) => logFirestoreError(err, 'list', 'ticketTypes'));
+          if (!snapshot.metadata.fromCache) {
+            this.lastServerSyncAt = Date.now();
+          }
+          this.applyServerTicketTypes(list, isCleared);
+        },
+        (err) => logFirestoreError(err, 'list', 'ticketTypes')
+      );
 
       // 2. Listen to Bookings (real-time reflection from all smartphones -> single Admin Dashboard)
-      onSnapshot(collection(db, 'bookings'), (snapshot) => {
-        this.hasFirestoreBookingsSync = true;
-        const list: Booking[] = [];
-        snapshot.forEach((d) => list.push(d.data() as Booking));
-        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        const reconciled = this.reconcileSingleBookingPrices(list, true);
-        this.bookingsCache = reconciled;
-        safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, reconciled);
-        this.reconcileTicketTypesWithActualData(true);
-        this.notify();
-      }, (err) => logFirestoreError(err, 'list', 'bookings'));
+      onSnapshot(
+        collection(db, 'bookings'),
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (snapshot.metadata.fromCache && !this.hasFirestoreBookingsSync && snapshot.empty) return;
+          const list: Booking[] = [];
+          snapshot.forEach((d) => list.push(d.data() as Booking));
+          if (!snapshot.metadata.fromCache) {
+            this.lastServerSyncAt = Date.now();
+          }
+          this.applyServerBookings(list);
+        },
+        (err) => logFirestoreError(err, 'list', 'bookings')
+      );
 
       // 3. Listen to Issued Tickets (real-time attendee biodata & QR status across all devices)
-      onSnapshot(collection(db, 'issuedTickets'), (snapshot) => {
-        const list: IssuedTicket[] = [];
-        snapshot.forEach((d) => list.push(d.data() as IssuedTicket));
-        list.sort((a, b) => {
-          const tsA = Number(a.id.split('_')[1]) || 0;
-          const tsB = Number(b.id.split('_')[1]) || 0;
-          return tsB - tsA;
-        });
-        this.issuedTicketsCache = list;
-        safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, list);
-        this.reconcileTicketTypesWithActualData(true);
-        this.notify();
-      }, (err) => logFirestoreError(err, 'list', 'issuedTickets'));
+      onSnapshot(
+        collection(db, 'issuedTickets'),
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (snapshot.metadata.fromCache && snapshot.empty) return;
+          const list: IssuedTicket[] = [];
+          snapshot.forEach((d) => list.push(d.data() as IssuedTicket));
+          if (!snapshot.metadata.fromCache) {
+            this.lastServerSyncAt = Date.now();
+          }
+          this.applyServerIssuedTickets(list);
+        },
+        (err) => logFirestoreError(err, 'list', 'issuedTickets')
+      );
 
       // 4. Listen to Gate Check-In Logs
-      onSnapshot(collection(db, 'checkInLogs'), (snapshot) => {
-        const list: CheckInLog[] = [];
-        snapshot.forEach((d) => list.push(d.data() as CheckInLog));
-        list.sort((a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime());
-        const sliced = list.slice(0, 150);
-        this.logsCache = sliced;
-        safeSetLocalStorage(STORAGE_KEYS.LOGS, sliced);
-        this.notify();
-      }, (err) => logFirestoreError(err, 'list', 'checkInLogs'));
+      onSnapshot(
+        collection(db, 'checkInLogs'),
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (snapshot.metadata.fromCache && snapshot.empty) return;
+          const list: CheckInLog[] = [];
+          snapshot.forEach((d) => list.push(d.data() as CheckInLog));
+          this.applyServerLogs(list);
+        },
+        (err) => logFirestoreError(err, 'list', 'checkInLogs')
+      );
 
       // 5. Listen to Global Admin Session Epoch (forces immediate logout on other devices when revoked)
-      onSnapshot(doc(db, 'events', 'evt_alas_cerita_2026'), (snapshot) => {
-        if (!snapshot.exists()) return;
-        const data = snapshot.data() as { adminSessionEpoch?: number };
-        if (typeof data.adminSessionEpoch === 'number' && data.adminSessionEpoch > this.cloudAdminEpoch) {
-          this.cloudAdminEpoch = data.adminSessionEpoch;
-          const localEpoch = Number(sessionStorage.getItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH) || 0);
-          if (localEpoch > 0 && localEpoch < this.cloudAdminEpoch) {
-            sessionStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION_USER);
-            sessionStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH);
+      onSnapshot(
+        doc(db, 'events', 'evt_alas_cerita_2026'),
+        (snapshot) => {
+          if (!snapshot.exists()) return;
+          const data = snapshot.data() as { adminSessionEpoch?: number };
+          if (typeof data.adminSessionEpoch === 'number' && data.adminSessionEpoch > this.cloudAdminEpoch) {
+            this.cloudAdminEpoch = data.adminSessionEpoch;
+            const localEpoch = Number(sessionStorage.getItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH) || 0);
+            if (localEpoch > 0 && localEpoch < this.cloudAdminEpoch) {
+              this.clearAdminSessionStorage();
+            }
+            this.notify();
           }
-          this.notify();
+        },
+        (err) => logFirestoreError(err, 'get', 'events/evt_alas_cerita_2026')
+      );
+
+      // 6. Auto-sync immediately when admin switches back to tab, gains window focus, or reconnects online
+      const handleWakeSync = () => {
+        if (this.getCurrentUser().role !== 'customer') {
+          void this.syncFromServer(false);
         }
-      }, (err) => logFirestoreError(err, 'get', 'events/evt_alas_cerita_2026'));
+      };
+      window.addEventListener('focus', handleWakeSync);
+      window.addEventListener('online', () => {
+        if (this.getCurrentUser().role !== 'customer') {
+          void this.syncFromServer(true);
+        }
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          handleWakeSync();
+        }
+      });
     } catch (e) {
       console.warn('Firestore sync setup failed, operating on local cache:', e);
     }
@@ -219,10 +397,12 @@ class StorageService {
     if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
       safeSetLocalStorage(STORAGE_KEYS.USERS, INITIAL_USERS);
     }
-    // Always enforce customer default in persistent localStorage so legacy saved admin sessions are logged out
+    // Always enforce customer default & purge bulk PII from localStorage for non-admin sessions
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_cust');
-    if (!localStorage.getItem(STORAGE_KEYS.LOGS)) {
-      safeSetLocalStorage(STORAGE_KEYS.LOGS, isCleared ? [] : INITIAL_LOGS);
+    if (this.getCurrentUser().role === 'customer') {
+      localStorage.removeItem(STORAGE_KEYS.BOOKINGS);
+      localStorage.removeItem(STORAGE_KEYS.ISSUED_TICKETS);
+      localStorage.removeItem(STORAGE_KEYS.LOGS);
     }
   }
 
@@ -237,145 +417,105 @@ class StorageService {
     this.listeners.forEach((l) => l());
   }
 
-  public async resetAllData(): Promise<{ success: boolean; message: string }> {
-    if (typeof window === 'undefined') {
-      return { success: true, message: 'Database dikembalikan ke data awal.' };
+  private clearAdminSessionStorage() {
+    if (typeof window === 'undefined') return;
+    sessionStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION_USER);
+    sessionStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH);
+    sessionStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION_SIG);
+    sessionStorage.removeItem(STORAGE_KEYS.ADMIN_LAST_ACTIVE);
+    localStorage.removeItem(STORAGE_KEYS.BOOKINGS);
+    localStorage.removeItem(STORAGE_KEYS.ISSUED_TICKETS);
+    localStorage.removeItem(STORAGE_KEYS.LOGS);
+  }
+
+  private assertAuthorizedRole(allowedRoles: UserRole[]): User | null {
+    const active = this.getCurrentUser();
+    if (!allowedRoles.includes(active.role)) {
+      return null;
     }
-    localStorage.removeItem(STORAGE_KEYS.SIMULATION_CLEARED);
-    localStorage.removeItem(STORAGE_KEYS.MY_LOCAL_BOOKINGS);
-    localStorage.removeItem(STORAGE_KEYS.MY_LOCAL_TICKETS);
-    this.ticketTypesCache = [...INITIAL_TICKET_TYPES];
-    this.bookingsCache = [...INITIAL_BOOKINGS];
-    this.issuedTicketsCache = [...INITIAL_ISSUED_TICKETS];
-    this.logsCache = [...INITIAL_LOGS];
+    this.touchAdminSessionActivity();
+    return active;
+  }
 
-    safeSetLocalStorage(STORAGE_KEYS.EVENTS, INITIAL_EVENTS);
-    safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, INITIAL_TICKET_TYPES);
-    safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, INITIAL_BOOKINGS);
-    safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, INITIAL_ISSUED_TICKETS);
-    safeSetLocalStorage(STORAGE_KEYS.USERS, INITIAL_USERS);
-    safeSetLocalStorage(STORAGE_KEYS.LOGS, INITIAL_LOGS);
+  public touchAdminSessionActivity() {
+    if (typeof window === 'undefined') return;
+    if (sessionStorage.getItem(STORAGE_KEYS.ADMIN_SESSION_USER)) {
+      sessionStorage.setItem(STORAGE_KEYS.ADMIN_LAST_ACTIVE, String(Date.now()));
+    }
+  }
 
-    // Clean existing Firestore documents first, then re-seed initial sample data
+  public getAdminLoginLockStatus(): { locked: boolean; remainingSeconds: number; failedCount: number } {
+    if (typeof window === 'undefined') return { locked: false, remainingSeconds: 0, failedCount: 0 };
     try {
-      const bookingsSnap = await getDocs(collection(db, 'bookings'));
-      await Promise.all(bookingsSnap.docs.map((d) => deleteDoc(doc(db, 'bookings', d.id))));
-
-      const ticketsSnap = await getDocs(collection(db, 'issuedTickets'));
-      await Promise.all(ticketsSnap.docs.map((d) => deleteDoc(doc(db, 'issuedTickets', d.id))));
-
-      const logsSnap = await getDocs(collection(db, 'checkInLogs'));
-      await Promise.all(logsSnap.docs.map((d) => deleteDoc(doc(db, 'checkInLogs', d.id))));
-
-      await Promise.all([
-        ...INITIAL_TICKET_TYPES.map((tt) => setDoc(doc(db, 'ticketTypes', tt.id), sanitizeForFirestore(tt))),
-        ...INITIAL_BOOKINGS.map((b) => setDoc(doc(db, 'bookings', b.id), sanitizeForFirestore(b))),
-        ...INITIAL_ISSUED_TICKETS.map((t) => setDoc(doc(db, 'issuedTickets', t.id), sanitizeForFirestore(t))),
-        ...INITIAL_LOGS.map((l) => setDoc(doc(db, 'checkInLogs', l.id), sanitizeForFirestore(l))),
-      ]);
-    } catch (err) {
-      logFirestoreError(err, 'write', 'resetAllData');
+      const raw = localStorage.getItem(STORAGE_KEYS.ADMIN_LOGIN_GUARD);
+      if (!raw) return { locked: false, remainingSeconds: 0, failedCount: 0 };
+      const parsed = JSON.parse(raw) as { failedCount?: number; lockedUntil?: number };
+      const now = Date.now();
+      if (parsed.lockedUntil && parsed.lockedUntil > now) {
+        return {
+          locked: true,
+          remainingSeconds: Math.ceil((parsed.lockedUntil - now) / 1000),
+          failedCount: parsed.failedCount || ADMIN_LOGIN_MAX_ATTEMPTS,
+        };
+      }
+      if (parsed.lockedUntil && parsed.lockedUntil <= now) {
+        localStorage.removeItem(STORAGE_KEYS.ADMIN_LOGIN_GUARD);
+        return { locked: false, remainingSeconds: 0, failedCount: 0 };
+      }
+      return { locked: false, remainingSeconds: 0, failedCount: parsed.failedCount || 0 };
+    } catch {
+      return { locked: false, remainingSeconds: 0, failedCount: 0 };
     }
+  }
 
-    this.notify();
+  public recordFailedAdminLogin(attemptedUsername: string): {
+    locked: boolean;
+    remainingAttempts: number;
+    remainingSeconds: number;
+  } {
+    if (typeof window === 'undefined') {
+      return { locked: false, remainingAttempts: ADMIN_LOGIN_MAX_ATTEMPTS, remainingSeconds: 0 };
+    }
+    const status = this.getAdminLoginLockStatus();
+    if (status.locked) {
+      return { locked: true, remainingAttempts: 0, remainingSeconds: status.remainingSeconds };
+    }
+    const nextFailed = status.failedCount + 1;
+    if (nextFailed >= ADMIN_LOGIN_MAX_ATTEMPTS) {
+      const lockedUntil = Date.now() + ADMIN_LOGIN_LOCKOUT_MS;
+      localStorage.setItem(
+        STORAGE_KEYS.ADMIN_LOGIN_GUARD,
+        JSON.stringify({ failedCount: nextFailed, lockedUntil })
+      );
+      this.recordLog({
+        staffId: 'security_guard',
+        staffName: 'Sistem Keamanan Portal',
+        method: 'manual_supervisor',
+        result: 'rate_limited',
+        message: `Login admin dikunci 3 menit setelah 5x percobaan gagal (user: ${sanitizeText(attemptedUsername, 40) || '-'})`,
+        deviceInfo: 'Admin Auth Firewall',
+        gateName: 'Portal Admin',
+      });
+      return {
+        locked: true,
+        remainingAttempts: 0,
+        remainingSeconds: Math.ceil(ADMIN_LOGIN_LOCKOUT_MS / 1000),
+      };
+    }
+    localStorage.setItem(
+      STORAGE_KEYS.ADMIN_LOGIN_GUARD,
+      JSON.stringify({ failedCount: nextFailed, lockedUntil: 0 })
+    );
     return {
-      success: true,
-      message: 'Database berhasil dikembalikan ke data awal contoh.',
+      locked: false,
+      remainingAttempts: ADMIN_LOGIN_MAX_ATTEMPTS - nextFailed,
+      remainingSeconds: 0,
     };
   }
 
-  /**
-   * Clears ALL simulation/dummy data permanently for live production use:
-   * - Empties bookings (0 orders)
-   * - Empties issued tickets (0 attendees)
-   * - Empties gate check-in logs
-   * - Restores ticket types to pristine 100% full capacity
-   * - Cleans cloud Firestore documents
-   */
-  public async clearAllSimulationData(): Promise<{ success: boolean; message: string }> {
-    if (typeof window === 'undefined') return { success: true, message: 'Data simulasi telah dibersihkan.' };
-
-    // 1. Mark simulation as cleared permanently
-    localStorage.setItem(STORAGE_KEYS.SIMULATION_CLEARED, 'true');
-
-    // 2. Clear bookings, issuedTickets, logs in memory & localStorage
-    localStorage.removeItem(STORAGE_KEYS.MY_LOCAL_BOOKINGS);
-    localStorage.removeItem(STORAGE_KEYS.MY_LOCAL_TICKETS);
-    this.bookingsCache = [];
-    this.issuedTicketsCache = [];
-    this.logsCache = [];
-    safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, []);
-    safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, []);
-    safeSetLocalStorage(STORAGE_KEYS.LOGS, []);
-
-    // 3. Reset ticket tiers to full pristine quotas (ready for 100% production sales)
-    const pristineTiers: TicketType[] = [
-      {
-        id: 'tt_alas_single',
-        eventId: 'evt_alas_cerita_2026',
-        name: 'Single',
-        price: SINGLE_PROMO_PRICE,
-        quota: 120,
-        availableQuota: 120,
-        heldQuota: 0,
-        saleStart: '2026-11-01T00:00:00Z',
-        saleEnd: '2026-12-04T23:59:59Z',
-        description: 'Paket untuk 1 orang peserta. Pendaftar 1–13 seharga Rp70.000, pendaftar ke-14 ke atas seharga Rp80.000.',
-        perks: ALAS_CERITA_PERKS,
-      },
-      {
-        id: 'tt_alas_couple',
-        eventId: 'evt_alas_cerita_2026',
-        name: 'Couple',
-        price: 155000,
-        quota: 70,
-        availableQuota: 70,
-        heldQuota: 0,
-        saleStart: '2026-11-01T00:00:00Z',
-        saleEnd: '2026-12-04T23:59:59Z',
-        description: 'Paket untuk 2 orang hadir bersama. Semua paket mendapat fasilitas lengkap yang sama.',
-        perks: ALAS_CERITA_PERKS,
-      },
-      {
-        id: 'tt_alas_circle',
-        eventId: 'evt_alas_cerita_2026',
-        name: 'Circle',
-        price: 225000,
-        quota: 50,
-        availableQuota: 50,
-        heldQuota: 0,
-        saleStart: '2026-11-01T00:00:00Z',
-        saleEnd: '2026-12-04T23:59:59Z',
-        description: 'Paket untuk 3 orang / circle hadir bersama. Semua paket mendapat fasilitas lengkap yang sama.',
-        perks: ALAS_CERITA_PERKS,
-      },
-    ];
-    this.ticketTypesCache = pristineTiers;
-    safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, pristineTiers);
-
-    // 4. Delete Firestore simulation documents in cloud
-    try {
-      await Promise.all(
-        pristineTiers.map((tier) => setDoc(doc(db, 'ticketTypes', tier.id), sanitizeForFirestore(tier)))
-      );
-
-      const bookingsSnap = await getDocs(collection(db, 'bookings'));
-      await Promise.all(bookingsSnap.docs.map((d) => deleteDoc(doc(db, 'bookings', d.id))));
-
-      const ticketsSnap = await getDocs(collection(db, 'issuedTickets'));
-      await Promise.all(ticketsSnap.docs.map((d) => deleteDoc(doc(db, 'issuedTickets', d.id))));
-
-      const logsSnap = await getDocs(collection(db, 'checkInLogs'));
-      await Promise.all(logsSnap.docs.map((d) => deleteDoc(doc(db, 'checkInLogs', d.id))));
-    } catch (e) {
-      logFirestoreError(e, 'delete', 'clearAllSimulationData');
-    }
-
-    this.notify();
-    return { 
-      success: true, 
-      message: 'Seluruh data simulasi berhasil dihapus. Dashboard transaksi dan peserta kini kosong dan siap digunakan untuk penjualan tiket asli!' 
-    };
+  public resetAdminLoginRateLimit() {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_LOGIN_GUARD);
   }
 
   // --- Users & Current Active Role ---
@@ -400,13 +540,21 @@ class StorageService {
     try {
       const sessionUserId = sessionStorage.getItem(STORAGE_KEYS.ADMIN_SESSION_USER);
       const sessionEpoch = Number(sessionStorage.getItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH) || 0);
+      const sessionSig = sessionStorage.getItem(STORAGE_KEYS.ADMIN_SESSION_SIG) || '';
+      const lastActive = Number(sessionStorage.getItem(STORAGE_KEYS.ADMIN_LAST_ACTIVE) || 0);
       const minRequiredEpoch = Math.max(MIN_VALID_ADMIN_EPOCH, this.cloudAdminEpoch);
 
       if (sessionUserId && sessionUserId !== 'usr_cust' && sessionEpoch >= minRequiredEpoch) {
-        const matched = users.find((u) => u.id === sessionUserId);
-        if (matched && matched.role !== 'customer') {
-          return matched;
+        const expectedSig = computeSessionBindingToken(sessionUserId, sessionEpoch);
+        const isNotIdleExpired = lastActive > 0 && Date.now() - lastActive <= ADMIN_IDLE_TIMEOUT_MS;
+        if (sessionSig === expectedSig && isNotIdleExpired) {
+          const matched = users.find((u) => u.id === sessionUserId);
+          if (matched && matched.role !== 'customer') {
+            return matched;
+          }
         }
+        // Invalid, tampered, or idle-expired admin session -> purge immediately
+        this.clearAdminSessionStorage();
       }
     } catch {
       // sessionStorage unavailable -> fallback to customer
@@ -418,14 +566,16 @@ class StorageService {
   public setCurrentUser(userId: string) {
     if (typeof window !== 'undefined') {
       if (!userId || userId === 'usr_cust') {
-        sessionStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION_USER);
-        sessionStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH);
+        this.clearAdminSessionStorage();
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_cust');
       } else {
         const newEpoch = Math.max(Date.now(), MIN_VALID_ADMIN_EPOCH, this.cloudAdminEpoch + 1);
+        const sessionSig = computeSessionBindingToken(userId, newEpoch);
         this.cloudAdminEpoch = newEpoch;
         sessionStorage.setItem(STORAGE_KEYS.ADMIN_SESSION_USER, userId);
         sessionStorage.setItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH, String(newEpoch));
+        sessionStorage.setItem(STORAGE_KEYS.ADMIN_SESSION_SIG, sessionSig);
+        sessionStorage.setItem(STORAGE_KEYS.ADMIN_LAST_ACTIVE, String(Date.now()));
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_cust');
 
         // Immediately invalidate any other older admin sessions active across other browsers/devices
@@ -434,19 +584,28 @@ class StorageService {
           { adminSessionEpoch: newEpoch },
           { merge: true }
         ).catch((err) => logFirestoreError(err, 'write', 'events/evt_alas_cerita_2026'));
+
+        // Immediately sync freshest server records upon Admin login
+        void this.syncFromServer(true);
       }
     }
     this.notify();
   }
 
   public async revokeOtherAdminSessions(): Promise<{ success: boolean; message: string }> {
-    const current = this.getCurrentUser();
+    const current = this.assertAuthorizedRole(['super_admin', 'gate_staff', 'gate_supervisor']);
+    if (!current) {
+      return { success: false, message: 'Akses ditolak: hanya admin aktif yang dapat mencabut sesi lain.' };
+    }
     const newEpoch = Math.max(Date.now(), MIN_VALID_ADMIN_EPOCH, this.cloudAdminEpoch + 1);
+    const sessionSig = computeSessionBindingToken(current.id, newEpoch);
     this.cloudAdminEpoch = newEpoch;
 
-    if (typeof window !== 'undefined' && current.role !== 'customer') {
+    if (typeof window !== 'undefined') {
       sessionStorage.setItem(STORAGE_KEYS.ADMIN_SESSION_USER, current.id);
       sessionStorage.setItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH, String(newEpoch));
+      sessionStorage.setItem(STORAGE_KEYS.ADMIN_SESSION_SIG, sessionSig);
+      sessionStorage.setItem(STORAGE_KEYS.ADMIN_LAST_ACTIVE, String(Date.now()));
     }
 
     try {
@@ -491,6 +650,7 @@ class StorageService {
   }
 
   public saveEvent(event: Event) {
+    if (!this.assertAuthorizedRole(['super_admin'])) return;
     const events = this.getEvents();
     const idx = events.findIndex((e) => e.id === event.id);
     if (idx >= 0) {
@@ -503,6 +663,7 @@ class StorageService {
   }
 
   public deleteEvent(eventId: string) {
+    if (!this.assertAuthorizedRole(['super_admin'])) return;
     const events = this.getEvents().filter((e) => e.id !== eventId);
     localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(events));
     this.notify();
@@ -793,6 +954,7 @@ class StorageService {
   }
 
   public saveTicketType(ticketType: TicketType) {
+    if (!this.assertAuthorizedRole(['super_admin'])) return;
     const all = [...this.getTicketTypes()];
     const idx = all.findIndex((t) => t.id === ticketType.id);
     if (idx >= 0) {
@@ -943,6 +1105,9 @@ class StorageService {
    * Delete a single booking and all its associated issued tickets from local & Firestore
    */
   public async deleteBooking(bookingId: string): Promise<{ success: boolean; message: string }> {
+    if (!this.assertAuthorizedRole(['super_admin'])) {
+      return { success: false, message: 'Akses ditolak: hanya Super Admin yang dapat menghapus transaksi.' };
+    }
     const currentBookings = this.getBookings();
     const targetBooking = currentBookings.find((b) => b.id === bookingId);
     const updatedBookings = currentBookings.filter((b) => b.id !== bookingId);
@@ -995,6 +1160,7 @@ class StorageService {
     quantity: number;
     attendees: Array<{ name: string; email: string; phone: string; origin: string }>;
   }): { success: boolean; booking?: Booking; error?: string } {
+    const safeQuantity = Math.max(1, Math.min(20, Math.floor(params.quantity || 1)));
     const ticketTypes = [...this.getTicketTypes()];
     const ttIndex = ticketTypes.findIndex((t) => t.id === params.ticketTypeId);
     if (ttIndex === -1) {
@@ -1002,16 +1168,16 @@ class StorageService {
     }
 
     const targetTT = { ...ticketTypes[ttIndex] };
-    if (targetTT.availableQuota < params.quantity) {
+    if (targetTT.availableQuota < safeQuantity) {
       return {
         success: false,
-        error: `Sisa kuota tiket tidak mencukupi (Tersisa: ${targetTT.availableQuota}, Diminta: ${params.quantity}).`,
+        error: `Sisa kuota tiket tidak mencukupi (Tersisa: ${targetTT.availableQuota}, Diminta: ${safeQuantity}).`,
       };
     }
 
     // 2. Pessimistic local lock reduction: deduct available quota, add to heldQuota
-    targetTT.availableQuota -= params.quantity;
-    targetTT.heldQuota = (targetTT.heldQuota || 0) + params.quantity;
+    targetTT.availableQuota -= safeQuantity;
+    targetTT.heldQuota = (targetTT.heldQuota || 0) + safeQuantity;
     ticketTypes[ttIndex] = targetTT;
     this.ticketTypesCache = ticketTypes;
     safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, ticketTypes);
@@ -1019,8 +1185,8 @@ class StorageService {
     // Calculate booking total amount (with Single tiered pricing: #1–13 = Rp 70.000, #14+ = Rp 80.000)
     const computedTotalAmount =
       params.ticketTypeId === 'tt_alas_single'
-        ? this.calculateSingleTotal(params.quantity)
-        : targetTT.price * params.quantity;
+        ? this.calculateSingleTotal(safeQuantity)
+        : targetTT.price * safeQuantity;
 
     // 3. Generate booking with collision-proof ID and 30 minute expiration
     const now = new Date();
@@ -1029,12 +1195,22 @@ class StorageService {
     const invoiceCode = `INV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${invoiceNum}`;
     const bookingId = `bkg_${Date.now()}_${generateUniqueSuffix(5)}`;
 
+    const cleanCustomerName = sanitizeText(params.customerName, 120);
+    const cleanCustomerEmail = sanitizeEmail(params.customerEmail);
+    const cleanCustomerPhone = sanitizePhone(params.customerPhone);
+    const cleanAttendees = params.attendees.map((att) => ({
+      name: sanitizeText(att.name, 120) || cleanCustomerName,
+      email: sanitizeEmail(att.email) || cleanCustomerEmail,
+      phone: sanitizePhone(att.phone) || cleanCustomerPhone,
+      origin: sanitizeText(att.origin, 150) || 'Umum',
+    }));
+
     const newBooking: Booking = {
       id: bookingId,
       userId: params.userId,
-      customerName: params.customerName,
-      customerEmail: params.customerEmail,
-      customerPhone: params.customerPhone,
+      customerName: cleanCustomerName,
+      customerEmail: cleanCustomerEmail,
+      customerPhone: cleanCustomerPhone,
       eventId: params.eventId,
       invoiceCode,
       totalAmount: computedTotalAmount,
@@ -1042,17 +1218,16 @@ class StorageService {
       createdAt: now.toISOString(),
       expiresAt,
       ticketTypeId: params.ticketTypeId,
-      quantity: params.quantity,
+      quantity: safeQuantity,
     };
 
     const bookings = [newBooking, ...this.getBookings()];
     this.bookingsCache = bookings;
-    safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, bookings);
 
     // Save temporary attendee draft both in-memory AND sessionStorage (safe for WhatsApp/Instagram mobile WebViews)
-    this.pendingAttendeesMap.set(newBooking.id, params.attendees);
+    this.pendingAttendeesMap.set(newBooking.id, cleanAttendees);
     try {
-      sessionStorage.setItem(`booking_attendees_${newBooking.id}`, JSON.stringify(params.attendees));
+      sessionStorage.setItem(`booking_attendees_${newBooking.id}`, JSON.stringify(cleanAttendees));
     } catch {
       // memory map already holds attendees
     }
@@ -1078,16 +1253,24 @@ class StorageService {
     const booking: Booking = { ...bookings[bIndex] };
     if (booking.paymentStatus === 'paid') return { success: true };
 
+    if (paymentProofUrl) {
+      const isValidProof = /^data:image\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(paymentProofUrl);
+      if (!isValidProof || paymentProofUrl.length > 900_000) {
+        return { success: false, error: 'Format atau ukuran gambar bukti transfer tidak valid.' };
+      }
+    }
+
     const now = new Date().toISOString();
     booking.paymentStatus = 'paid';
     booking.verificationStatus = 'pending_verification';
-    booking.paymentMethod = paymentMethod;
+    booking.paymentMethod = sanitizeText(paymentMethod, 30) || 'qris';
     if (paymentProofUrl) {
       booking.paymentProofUrl = paymentProofUrl;
       booking.proofUploadedAt = now;
     }
-    if (senderName) {
-      booking.senderName = senderName;
+    const cleanSender = sanitizeText(senderName || '', 120);
+    if (cleanSender) {
+      booking.senderName = cleanSender;
     }
     booking.paidAt = now;
 
@@ -1125,16 +1308,16 @@ class StorageService {
     const baseTimestamp = Date.now();
 
     attendeesList.forEach((att, idx) => {
-      const origin = (att.origin || 'Umum').trim();
+      const origin = sanitizeText(att.origin || 'Umum', 150) || 'Umum';
       newIssued.push({
         id: `tkt_${baseTimestamp}_${idx}_${generateUniqueSuffix(4)}`,
         bookingId: booking.id,
         eventId: booking.eventId,
         ticketTypeId: booking.ticketTypeId,
         ticketTypeName: ticketType?.name || 'Standard Pass',
-        attendeeName: att.name,
-        attendeeEmail: att.email,
-        attendeePhone: att.phone,
+        attendeeName: sanitizeText(att.name, 120),
+        attendeeEmail: sanitizeEmail(att.email),
+        attendeePhone: sanitizePhone(att.phone),
         attendeeOrigin: origin,
         packageName: ticketType?.name || 'Single',
         packageMemberIndex: idx + 1,
@@ -1200,11 +1383,14 @@ class StorageService {
     // Update local state caches & cleanup temp map after confirmed cloud write
     bookings[bIndex] = booking;
     this.bookingsCache = bookings;
-    safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, bookings);
 
     const updatedIssued = [...newIssued, ...existingIssued];
     this.issuedTicketsCache = updatedIssued;
-    safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, updatedIssued);
+
+    if (this.getCurrentUser().role !== 'customer') {
+      safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, bookings);
+      safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, updatedIssued);
+    }
 
     this.ticketTypesCache = ticketTypes;
     safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, ticketTypes);
@@ -1227,6 +1413,10 @@ class StorageService {
    * Admin approves and verifies booking payment proof, activating official E-Tickets
    */
   public verifyBookingAndTickets(bookingId: string, adminUser: User): { success: boolean; message: string } {
+    const activeAdmin = this.assertAuthorizedRole(['super_admin']);
+    if (!activeAdmin) {
+      return { success: false, message: 'Akses ditolak: Anda harus login sebagai Super Admin.' };
+    }
     const bookings = [...this.getBookings()];
     const bIndex = bookings.findIndex((b) => b.id === bookingId);
     const now = new Date().toISOString();
@@ -1238,9 +1428,17 @@ class StorageService {
         verifiedBy: adminUser.name,
       };
       this.bookingsCache = bookings;
-      safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, bookings);
-      setDoc(doc(db, 'bookings', bookingId), sanitizeForFirestore(bookings[bIndex])).catch((err) =>
-        logFirestoreError(err, 'update', `bookings/${bookingId}`)
+      if (this.getCurrentUser().role !== 'customer') {
+        safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, bookings);
+      }
+      updateDoc(doc(db, 'bookings', bookingId), {
+        verificationStatus: 'verified',
+        verifiedAt: now,
+        verifiedBy: adminUser.name,
+      }).catch(() =>
+        setDoc(doc(db, 'bookings', bookingId), sanitizeForFirestore(bookings[bIndex])).catch((err) =>
+          logFirestoreError(err, 'update', `bookings/${bookingId}`)
+        )
       );
     }
 
@@ -1256,15 +1454,23 @@ class StorageService {
         };
         allTickets[i] = updatedTicket;
         updatedCount++;
-        setDoc(doc(db, 'issuedTickets', t.id), sanitizeForFirestore(updatedTicket)).catch((err) =>
-          logFirestoreError(err, 'update', `issuedTickets/${t.id}`)
+        updateDoc(doc(db, 'issuedTickets', t.id), {
+          verificationStatus: 'verified',
+          verifiedAt: now,
+          verifiedBy: adminUser.name,
+        }).catch(() =>
+          setDoc(doc(db, 'issuedTickets', t.id), sanitizeForFirestore(updatedTicket)).catch((err) =>
+            logFirestoreError(err, 'update', `issuedTickets/${t.id}`)
+          )
         );
       }
     });
 
     if (updatedCount > 0) {
       this.issuedTicketsCache = allTickets;
-      safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, allTickets);
+      if (this.getCurrentUser().role !== 'customer') {
+        safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, allTickets);
+      }
     }
 
     this.notify();
@@ -1326,6 +1532,9 @@ class StorageService {
    * Delete an individual issued ticket from local & Firestore
    */
   public async deleteIssuedTicket(ticketId: string): Promise<{ success: boolean; message: string }> {
+    if (!this.assertAuthorizedRole(['super_admin'])) {
+      return { success: false, message: 'Akses ditolak: hanya Super Admin yang dapat menghapus tiket.' };
+    }
     const currentTickets = this.getIssuedTickets();
     const targetTicket = currentTickets.find((t) => t.id === ticketId);
     const updatedTickets = currentTickets.filter((t) => t.id !== ticketId);
@@ -1369,6 +1578,13 @@ class StorageService {
     latencyMs: number;
   } {
     const startTime = performance.now();
+    if (!this.assertAuthorizedRole(['super_admin', 'gate_staff', 'gate_supervisor'])) {
+      return {
+        result: 'invalid_token',
+        message: 'AKSES DITOLAK: Anda harus login sebagai Petugas Gate atau Admin resmi.',
+        latencyMs: Math.round(performance.now() - startTime),
+      };
+    }
     const cleanToken = qrToken.trim();
     const allTickets = this.getIssuedTickets();
 
@@ -1496,6 +1712,12 @@ class StorageService {
     tickets?: IssuedTicket[];
     error?: string;
   } {
+    if (!this.assertAuthorizedRole(['super_admin', 'gate_supervisor'])) {
+      return {
+        success: false,
+        error: 'AKSES DITOLAK: Modul helpdesk hanya dapat diakses oleh Supervisor atau Super Admin.',
+      };
+    }
     // Check Rate Limiter
     const rateLimitCheck = this.checkRateLimit();
     if (!rateLimitCheck.allowed) {
@@ -1549,6 +1771,13 @@ class StorageService {
     supervisorNote: string;
     supervisor: User;
   }): { success: boolean; message: string; result: CheckInResult; ticket?: IssuedTicket } {
+    if (!this.assertAuthorizedRole(['super_admin', 'gate_supervisor'])) {
+      return {
+        success: false,
+        message: 'AKSES DITOLAK: Hanya Supervisor atau Super Admin yang dapat melakukan verifikasi manual.',
+        result: 'invalid_token',
+      };
+    }
     const all = this.getIssuedTickets();
     const idx = all.findIndex((t) => t.id === params.ticketId);
     if (idx === -1) {
@@ -1556,7 +1785,8 @@ class StorageService {
     }
 
     const ticket = all[idx];
-    const cleanEntered = (params.enteredOrigin || params.enteredNik || params.enteredIdLast4 || '').trim().toUpperCase();
+    const safeSupervisorNote = sanitizeText(params.supervisorNote, 300) || 'Verifikasi manual oleh supervisor.';
+    const cleanEntered = sanitizeText(params.enteredOrigin || params.enteredNik || params.enteredIdLast4 || '', 150).toUpperCase();
     const storedOrigin = (ticket.attendeeOrigin || '').trim().toUpperCase();
     const storedNik = (ticket.attendeeNik || '').trim().toUpperCase();
     const storedLast4 = (ticket.attendeeIdLast4 || '').trim().toUpperCase();
@@ -1606,7 +1836,7 @@ class StorageService {
       checkedInBy: `${params.supervisor.name} (Supervisor Helpdesk)`,
       gateName: params.supervisor.staffGate || 'Posko Helpdesk',
       checkInMethod: 'manual_supervisor',
-      notes: params.supervisorNote,
+      notes: safeSupervisorNote,
     };
 
     allCopy[idx] = updatedTicket;
@@ -1620,7 +1850,7 @@ class StorageService {
       checkedInBy: `${params.supervisor.name} (Supervisor Helpdesk)`,
       gateName: params.supervisor.staffGate || 'Posko Helpdesk',
       checkInMethod: 'manual_supervisor',
-      notes: params.supervisorNote,
+      notes: safeSupervisorNote,
     }).catch((err) => logFirestoreError(err, 'update', `issuedTickets/${ticket.id}`));
 
     this.recordLog({
@@ -1631,7 +1861,7 @@ class StorageService {
       staffName: params.supervisor.name,
       method: 'manual_supervisor',
       result: 'success',
-      message: `Manual check-in berhasil diapprove supervisor. Catatan: ${params.supervisorNote}`,
+      message: `Manual check-in berhasil diapprove supervisor. Catatan: ${safeSupervisorNote}`,
       deviceInfo: 'Supervisor Helpdesk Workstation',
       gateName: params.supervisor.staffGate || 'Posko Helpdesk',
     });
@@ -1694,7 +1924,9 @@ class StorageService {
     logs.unshift(newLog);
     const sliced = logs.slice(0, 150);
     this.logsCache = sliced;
-    safeSetLocalStorage(STORAGE_KEYS.LOGS, sliced);
+    if (this.getCurrentUser().role !== 'customer') {
+      safeSetLocalStorage(STORAGE_KEYS.LOGS, sliced);
+    }
 
     // Sync log to Firestore
     setDoc(doc(db, 'checkInLogs', newLog.id), sanitizeForFirestore(newLog)).catch((err) =>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Event, TicketType, User } from '../../types';
 import { storageService } from '../../services/storageService';
+import { isValidEmail, isValidPhone, sanitizeEmail, sanitizePhone, sanitizeText } from '../../utils/security';
 import { 
   X, 
   AlertCircle, 
@@ -111,41 +112,52 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     // Validate each attendee according to package capacity
     for (let i = 0; i < attendees.length; i++) {
       const att = attendees[i];
-      if (!att.name.trim()) {
-        setFormError(`Nama lengkap peserta #${i + 1} (${selectedTier.name}) wajib diisi.`);
+      const cleanName = sanitizeText(att.name, 120);
+      const cleanOrigin = sanitizeText(att.origin, 150);
+      if (!cleanName || cleanName.length < 2) {
+        setFormError(`Nama lengkap peserta #${i + 1} (${selectedTier.name}) wajib diisi minimal 2 huruf.`);
         return;
       }
-      if (!att.origin.trim() || att.origin.trim().length < 2) {
-        setFormError(`Asal / Lembaga untuk peserta #${i + 1} (${att.name || 'Peserta'}) wajib diisi.`);
+      if (!cleanOrigin || cleanOrigin.length < 2) {
+        setFormError(`Asal / Lembaga untuk peserta #${i + 1} (${cleanName || 'Peserta'}) wajib diisi.`);
         return;
       }
       if (i === 0) {
-        if (!att.phone.trim()) {
-          setFormError('No. WhatsApp / HP Peserta #1 wajib diisi untuk konfirmasi pemesanan.');
+        if (!isValidPhone(att.phone)) {
+          setFormError('No. WhatsApp / HP Peserta #1 wajib berisi 8–16 digit angka yang valid.');
           return;
         }
-        if (!att.email.trim() || !att.email.includes('@')) {
-          setFormError('Alamat Email Peserta #1 wajib diisi dengan benar untuk pengiriman E-Ticket.');
+        if (!isValidEmail(att.email)) {
+          setFormError('Alamat Email Peserta #1 wajib menggunakan format email yang valid untuk pengiriman E-Ticket.');
+          return;
+        }
+      } else {
+        if (att.phone.trim() && !isValidPhone(att.phone)) {
+          setFormError(`No. WhatsApp / HP Peserta #${i + 1} tidak valid (8–16 digit angka).`);
+          return;
+        }
+        if (att.email.trim() && !isValidEmail(att.email)) {
+          setFormError(`Format email Peserta #${i + 1} tidak valid.`);
           return;
         }
       }
     }
 
-    const primaryEmail = attendees[0].email.trim();
-    const primaryPhone = attendees[0].phone.trim();
+    const primaryEmail = sanitizeEmail(attendees[0].email);
+    const primaryPhone = sanitizePhone(attendees[0].phone);
 
     onProceedToCheckout({
       eventId: event.id,
       ticketTypeId: selectedTier.id,
       quantity: 1,
-      customerName: attendees[0].name.trim(),
+      customerName: sanitizeText(attendees[0].name, 120),
       customerEmail: primaryEmail,
       customerPhone: primaryPhone,
       attendees: attendees.map((att) => ({
-        name: att.name.trim(),
-        email: att.email.trim() || primaryEmail,
-        phone: att.phone.trim() || primaryPhone,
-        origin: att.origin.trim(),
+        name: sanitizeText(att.name, 120),
+        email: sanitizeEmail(att.email) || primaryEmail,
+        phone: sanitizePhone(att.phone) || primaryPhone,
+        origin: sanitizeText(att.origin, 150),
       })),
     });
   };

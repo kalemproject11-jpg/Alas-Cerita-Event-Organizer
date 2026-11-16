@@ -2,41 +2,209 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
-    function isValidId(id) {
-      return id is string && id.size() <= 128;
-    }
-
-    // Events: Public read, authorized write
-    match /events/{eventId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // Ticket Types (Live Quotas): Public read, quota updates
-    match /ticketTypes/{ticketTypeId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    // Bookings: Public creation upon checkout, read for order verification, delete for admin cleanup
-    match /bookings/{bookingId} {
-      allow read, write, delete: if true;
-    }
-
-    // Issued Tickets: Checked by gate scanners, retrieved by ticket holders, delete for admin cleanup
-    match /issuedTickets/{ticketId} {
-      allow read, write, delete: if true;
-    }
-
-    // Check-in audit logs: Read, create, and delete for admin cleanup
-    match /checkInLogs/{logId} {
-      allow read, write, delete: if true;
-    }
-
-    // Default fallback
+    // Global Safety Net (Default-Deny)
     match /{document=**} {
       allow read, write: if false;
+    }
+
+    // --- Helper Primitives ---
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 3 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidTierId(tierId) {
+      return tierId in ['tt_alas_single', 'tt_alas_couple', 'tt_alas_circle'];
+    }
+
+    function isValidProofUrl(url) {
+      return url is string &&
+        url.size() > 0 &&
+        url.size() <= 900000 &&
+        url.matches('^data:image\\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$');
+    }
+
+    function isValidBookingCreate(data, bookingId) {
+      return isValidId(bookingId) &&
+        data.keys().hasAll([
+          'id', 'userId', 'customerName', 'customerEmail', 'customerPhone',
+          'eventId', 'invoiceCode', 'totalAmount', 'paymentStatus',
+          'verificationStatus', 'createdAt', 'expiresAt', 'ticketTypeId', 'quantity'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'userId', 'customerName', 'customerEmail', 'customerPhone',
+          'eventId', 'invoiceCode', 'totalAmount', 'paymentStatus',
+          'paymentMethod', 'paymentProofUrl', 'senderName', 'proofUploadedAt',
+          'verificationStatus', 'paidAt', 'createdAt', 'expiresAt',
+          'ticketTypeId', 'quantity'
+        ]) &&
+        data.id == bookingId &&
+        data.eventId == 'evt_alas_cerita_2026' &&
+        isValidTierId(data.ticketTypeId) &&
+        data.userId is string && data.userId.size() >= 3 && data.userId.size() <= 64 &&
+        data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 120 &&
+        data.customerEmail is string && data.customerEmail.size() >= 3 && data.customerEmail.size() <= 150 &&
+        data.customerPhone is string && data.customerPhone.size() >= 6 && data.customerPhone.size() <= 30 &&
+        data.invoiceCode is string && data.invoiceCode.size() >= 6 && data.invoiceCode.size() <= 40 &&
+        data.invoiceCode.matches('^INV-[0-9A-Za-z_\\-]+$') &&
+        data.paymentStatus == 'paid' &&
+        data.verificationStatus == 'pending_verification' &&
+        data.quantity is int && data.quantity >= 1 && data.quantity <= 20 &&
+        data.totalAmount is number &&
+        (
+          (data.ticketTypeId == 'tt_alas_single' && data.totalAmount >= 70000 * data.quantity && data.totalAmount <= 80000 * data.quantity) ||
+          (data.ticketTypeId == 'tt_alas_couple' && data.totalAmount == 155000 * data.quantity) ||
+          (data.ticketTypeId == 'tt_alas_circle' && data.totalAmount == 225000 * data.quantity)
+        ) &&
+        (!('paymentProofUrl' in data) || isValidProofUrl(data.paymentProofUrl)) &&
+        (!('senderName' in data) || (data.senderName is string && data.senderName.size() <= 120)) &&
+        (!('paymentMethod' in data) || (data.paymentMethod is string && data.paymentMethod.size() <= 30));
+    }
+
+    function isValidIssuedTicketCreate(data, ticketId) {
+      return isValidId(ticketId) &&
+        data.keys().hasAll([
+          'id', 'bookingId', 'eventId', 'ticketTypeId', 'ticketTypeName',
+          'attendeeName', 'attendeeEmail', 'attendeePhone',
+          'ticketNumber', 'qrToken', 'status', 'verificationStatus'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'bookingId', 'eventId', 'ticketTypeId', 'ticketTypeName',
+          'attendeeName', 'attendeeEmail', 'attendeePhone', 'attendeeOrigin',
+          'packageName', 'packageMemberIndex', 'packageTotalMembers',
+          'packageGroupName', 'ticketNumber', 'qrToken', 'status',
+          'verificationStatus', 'seat_or_gate'
+        ]) &&
+        data.id == ticketId &&
+        isValidId(data.bookingId) &&
+        data.eventId == 'evt_alas_cerita_2026' &&
+        isValidTierId(data.ticketTypeId) &&
+        data.ticketTypeName is string && data.ticketTypeName.size() >= 1 && data.ticketTypeName.size() <= 60 &&
+        data.attendeeName is string && data.attendeeName.size() >= 1 && data.attendeeName.size() <= 120 &&
+        data.attendeeEmail is string && data.attendeeEmail.size() >= 3 && data.attendeeEmail.size() <= 150 &&
+        data.attendeePhone is string && data.attendeePhone.size() >= 6 && data.attendeePhone.size() <= 30 &&
+        (!('attendeeOrigin' in data) || (data.attendeeOrigin is string && data.attendeeOrigin.size() <= 150)) &&
+        data.ticketNumber is string && data.ticketNumber.matches('^TCK-[2-9A-HJ-NP-Z]{4,8}$') &&
+        data.qrToken is string && data.qrToken.size() >= 16 && data.qrToken.size() <= 64 &&
+        data.status == 'valid' &&
+        data.verificationStatus == 'pending_verification';
+    }
+
+    function isValidCheckInLog(data, logId) {
+      return isValidId(logId) &&
+        data.keys().hasAll(['id', 'staffId', 'staffName', 'method', 'result', 'message', 'deviceInfo', 'scannedAt', 'gateName']) &&
+        data.keys().hasOnly(['id', 'issuedTicketId', 'ticketNumber', 'attendeeName', 'staffId', 'staffName', 'method', 'result', 'message', 'deviceInfo', 'scannedAt', 'gateName']) &&
+        data.id == logId &&
+        data.staffId is string && data.staffId.size() <= 64 &&
+        data.staffName is string && data.staffName.size() <= 120 &&
+        data.method in ['qr_scanner', 'manual_supervisor'] &&
+        data.result in ['success', 'duplicate_scan', 'invalid_token', 'unpaid', 'rate_limited'] &&
+        data.message is string && data.message.size() <= 400 &&
+        data.deviceInfo is string && data.deviceInfo.size() <= 150 &&
+        data.scannedAt is string && data.scannedAt.size() <= 64 &&
+        data.gateName is string && data.gateName.size() <= 120;
+    }
+
+    // Events: Read-only catalog, only adminSessionEpoch can advance monotonically
+    match /events/{eventId} {
+      allow read: if true;
+      allow create, delete: if false;
+      allow update: if eventId == 'evt_alas_cerita_2026' &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['adminSessionEpoch']) &&
+        incoming().adminSessionEpoch is number &&
+        incoming().adminSessionEpoch > 0 &&
+        (!('adminSessionEpoch' in existing()) || incoming().adminSessionEpoch >= existing().adminSessionEpoch);
+    }
+
+    // Ticket Types: Public read, strictly bounded quota/price sync updates, no delete
+    match /ticketTypes/{ticketTypeId} {
+      allow read: if true;
+      allow delete: if false;
+      allow create: if isValidTierId(ticketTypeId) &&
+        incoming().id == ticketTypeId &&
+        incoming().eventId == 'evt_alas_cerita_2026' &&
+        incoming().quota is int && incoming().quota > 0 && incoming().quota <= 500 &&
+        incoming().availableQuota is int && incoming().availableQuota >= 0 && incoming().availableQuota <= incoming().quota &&
+        incoming().price in [70000, 80000, 155000, 225000];
+      allow update: if isValidTierId(ticketTypeId) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['availableQuota', 'heldQuota', 'price', 'description']) &&
+        incoming().availableQuota is int && incoming().availableQuota >= 0 && incoming().availableQuota <= existing().quota &&
+        (!('heldQuota' in incoming()) || (incoming().heldQuota is int && incoming().heldQuota >= 0 && incoming().heldQuota <= existing().quota)) &&
+        incoming().price in [70000, 80000, 155000, 225000] &&
+        (!('description' in incoming()) || (incoming().description is string && incoming().description.size() <= 300));
+    }
+
+    // Bookings: Validated creation (pending verification + server-checked prices), immutable core fields on update
+    match /bookings/{bookingId} {
+      allow read: if true;
+      allow create: if isValidBookingCreate(incoming(), bookingId);
+      allow update: if isValidId(bookingId) &&
+        incoming().id == existing().id &&
+        incoming().invoiceCode == existing().invoiceCode &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().customerEmail == existing().customerEmail &&
+        incoming().get('ticketTypeId', '') == existing().get('ticketTypeId', '') &&
+        incoming().get('quantity', 1) == existing().get('quantity', 1) &&
+        (
+          (
+            existing().get('verificationStatus', 'pending_verification') != 'verified' &&
+            incoming().verificationStatus == 'verified' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['verificationStatus', 'verifiedAt', 'verifiedBy']) &&
+            incoming().verifiedAt is string && incoming().verifiedAt.size() <= 64 &&
+            incoming().verifiedBy is string && incoming().verifiedBy.size() <= 120
+          ) ||
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['totalAmount']) &&
+            incoming().totalAmount is number &&
+            incoming().totalAmount >= 70000 * existing().get('quantity', 1) &&
+            incoming().totalAmount <= 225000 * existing().get('quantity', 1)
+          )
+        );
+      allow delete: if isValidId(bookingId);
+    }
+
+    // Issued Tickets: Validated creation, terminal check-in state locking (anti-double-scan reset guard)
+    match /issuedTickets/{ticketId} {
+      allow read: if true;
+      allow create: if isValidIssuedTicketCreate(incoming(), ticketId);
+      allow update: if isValidId(ticketId) &&
+        incoming().id == existing().id &&
+        incoming().bookingId == existing().bookingId &&
+        incoming().ticketNumber == existing().ticketNumber &&
+        incoming().qrToken == existing().qrToken &&
+        (
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['verificationStatus', 'verifiedAt', 'verifiedBy']) &&
+            incoming().verificationStatus == 'verified' &&
+            incoming().verifiedAt is string && incoming().verifiedAt.size() <= 64 &&
+            incoming().verifiedBy is string && incoming().verifiedBy.size() <= 120
+          ) ||
+          (
+            existing().status == 'valid' &&
+            incoming().status == 'checked-in' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'checkedInAt', 'checkedInBy', 'gateName', 'checkInMethod', 'notes']) &&
+            incoming().checkedInAt is string && incoming().checkedInAt.size() <= 64 &&
+            incoming().checkedInBy is string && incoming().checkedInBy.size() <= 120 &&
+            incoming().gateName is string && incoming().gateName.size() <= 120 &&
+            incoming().checkInMethod in ['qr_scanner', 'manual_supervisor'] &&
+            (!('notes' in incoming()) || (incoming().notes is string && incoming().notes.size() <= 300))
+          )
+        );
+      allow delete: if isValidId(ticketId);
+    }
+
+    // Check-in & Security Audit Logs: Strictly append-only & immutable
+    match /checkInLogs/{logId} {
+      allow read: if true;
+      allow create: if isValidCheckInLog(incoming(), logId);
+      allow update, delete: if false;
     }
   }
 }
