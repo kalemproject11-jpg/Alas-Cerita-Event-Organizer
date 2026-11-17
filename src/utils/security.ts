@@ -131,3 +131,37 @@ export async function verifyImageMagicBytes(file: File): Promise<boolean> {
 
   return isJpeg || isPng || isWebp;
 }
+
+export const AUTHORIZED_ADMIN_EMAILS = ['kalemproject11@gmail.com'] as const;
+
+export function isAuthorizedAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  return (AUTHORIZED_ADMIN_EMAILS as readonly string[]).includes(normalized);
+}
+
+/**
+ * Cryptographically secure random integer in [0, max).
+ */
+export function secureRandomInt(max: number): number {
+  if (max <= 0) return 0;
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const arr = new Uint32Array(1);
+    const limit = Math.floor(0xffffffff / max) * max;
+    let val = 0;
+    do {
+      crypto.getRandomValues(arr);
+      val = arr[0];
+    } while (val >= limit);
+    return val % max;
+  }
+  return Math.floor(Math.random() * max);
+}
+
+export function secureRandomString(length: number, alphabet = '0123456789abcdefghijklmnopqrstuvwxyz'): string {
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += alphabet.charAt(secureRandomInt(alphabet.length));
+  }
+  return out;
+}

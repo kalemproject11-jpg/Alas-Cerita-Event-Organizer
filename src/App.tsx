@@ -68,6 +68,13 @@ export default function App() {
     prevRoleRef.current = currentUser.role;
   }, [currentUser.role, activeTab]);
 
+  // Refresh non-PII verification status for device-local purchase history when viewing Riwayat Pembelian
+  useEffect(() => {
+    if (activeTab === 'history') {
+      void storageService.refreshMyDevicePurchasesFromServer();
+    }
+  }, [activeTab]);
+
   // Keep admin session activity fresh on interaction and auto-logout after 30 minutes of inactivity
   useEffect(() => {
     if (currentUser.role === 'customer') return;

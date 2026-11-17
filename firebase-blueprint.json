@@ -102,6 +102,26 @@
         "gateName": { "type": "string" }
       },
       "required": ["ticketNumber", "result", "scannedAt"]
+    },
+    "BookingStatus": {
+      "title": "BookingStatus",
+      "description": "Non-PII verification status mirror for buyer device lookup",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "verificationStatus": { "type": "string", "enum": ["pending_verification", "verified", "rejected"] }
+      },
+      "required": ["id", "verificationStatus"]
+    },
+    "AdminAllowlist": {
+      "title": "AdminAllowlist",
+      "description": "Authorized admin email allowlist document",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string" }
+      },
+      "required": ["email"]
     }
   },
   "firestore": {
@@ -117,6 +137,10 @@
       "schema": { "$ref": "#/entities/Booking" },
       "description": "Customer booking orders"
     },
+    "/bookingStatuses/{bookingId}": {
+      "schema": { "$ref": "#/entities/BookingStatus" },
+      "description": "Public non-PII booking verification status lookup"
+    },
     "/issuedTickets/{ticketId}": {
       "schema": { "$ref": "#/entities/IssuedTicket" },
       "description": "Official issued tickets scanned at gate"
@@ -124,6 +148,10 @@
     "/checkInLogs/{logId}": {
       "schema": { "$ref": "#/entities/CheckInLog" },
       "description": "Gate admission audit log trail"
+    },
+    "/admins/{adminEmail}": {
+      "schema": { "$ref": "#/entities/AdminAllowlist" },
+      "description": "Authorized admin emails"
     }
   }
 }

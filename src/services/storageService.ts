@@ -1,12 +1,16 @@
 import { User, Event, TicketType, Booking, IssuedTicket, CheckInLog, CheckInResult, PaymentMethod, UserRole } from '../types';
-import { INITIAL_USERS, INITIAL_EVENTS, INITIAL_TICKET_TYPES, INITIAL_BOOKINGS, INITIAL_ISSUED_TICKETS, INITIAL_LOGS, ALAS_CERITA_PERKS } from '../data/mockData';
+import { INITIAL_USERS, INITIAL_EVENTS, INITIAL_TICKET_TYPES } from '../data/mockData';
 import { db, auth } from '../firebase';
-import { collection, doc, setDoc, updateDoc, deleteDoc, getDocs, getDocsFromServer, onSnapshot, runTransaction } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, getDoc, getDocFromServer, getDocsFromServer, onSnapshot, runTransaction } from 'firebase/firestore';
+import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
 import {
   computeSessionBindingToken,
+  isAuthorizedAdminEmail,
   sanitizeEmail,
   sanitizePhone,
   sanitizeText,
+  secureRandomInt,
+  secureRandomString,
 } from '../utils/security';
 
 export const SINGLE_PROMO_LIMIT = 13;
@@ -43,15 +47,11 @@ const MIN_VALID_ADMIN_EPOCH = Date.UTC(2026, 10, 16, 16, 38, 0);
 const TICKET_NUMBER_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
 function generateRandomTicketNumber(): string {
-  let code = '';
-  for (let i = 0; i < 4; i++) {
-    code += TICKET_NUMBER_CHARS.charAt(Math.floor(Math.random() * TICKET_NUMBER_CHARS.length));
-  }
-  return `TCK-${code}`;
+  return `TCK-${secureRandomString(4, TICKET_NUMBER_CHARS)}`;
 }
 
 function generateUniqueSuffix(len = 5): string {
-  return Math.random().toString(36).substring(2, 2 + len);
+  return secureRandomString(len);
 }
 
 function generateUUID(): string {
@@ -59,7 +59,7 @@ function generateUUID(): string {
     return crypto.randomUUID();
   }
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0;
+    const r = secureRandomInt(16);
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
@@ -118,6 +118,8 @@ class StorageService {
   private cloudAdminEpoch = MIN_VALID_ADMIN_EPOCH;
   private lastServerSyncAt = 0;
   private activeServerSync: Promise<boolean> | null = null;
+  private adminUnsubscribers: Array<() => void> = [];
+  private isAdminListenersAttached = false;
 
   // Canonical in-memory caches so large multi-phone datasets never hit localStorage 5MB limit
   private bookingsCache: Booking[] | null = null;
@@ -131,6 +133,86 @@ class StorageService {
   constructor() {
     this.initializeDefaults();
     this.initFirestoreSync();
+  }
+
+  public async verifyFirebaseAdminUser(fbUser: FirebaseUser | null): Promise<boolean> {
+    if (!fbUser || !fbUser.emailVerified || !fbUser.email) return false;
+    const normalizedEmail = fbUser.email.trim().toLowerCase();
+    if (isAuthorizedAdminEmail(normalizedEmail)) return true;
+    try {
+      const snap = await getDoc(doc(db, 'admins', normalizedEmail));
+      return snap.exists();
+    } catch {
+      return false;
+    }
+  }
+
+  private detachAdminListeners() {
+    this.adminUnsubscribers.forEach((unsub) => {
+      try {
+        unsub();
+      } catch {
+        // ignore unsubscribe errors
+      }
+    });
+    this.adminUnsubscribers = [];
+    this.isAdminListenersAttached = false;
+  }
+
+  private attachAdminListeners() {
+    if (this.isAdminListenersAttached || typeof window === 'undefined') return;
+    this.isAdminListenersAttached = true;
+
+    // Bookings listener (Admin-only)
+    this.adminUnsubscribers.push(
+      onSnapshot(
+        collection(db, 'bookings'),
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (snapshot.metadata.fromCache && !this.hasFirestoreBookingsSync && snapshot.empty) return;
+          const list: Booking[] = [];
+          snapshot.forEach((d) => list.push(d.data() as Booking));
+          if (!snapshot.metadata.fromCache) {
+            this.lastServerSyncAt = Date.now();
+          }
+          this.applyServerBookings(list);
+        },
+        (err) => logFirestoreError(err, 'list', 'bookings')
+      )
+    );
+
+    // Issued Tickets listener (Admin-only)
+    this.adminUnsubscribers.push(
+      onSnapshot(
+        collection(db, 'issuedTickets'),
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (snapshot.metadata.fromCache && snapshot.empty) return;
+          const list: IssuedTicket[] = [];
+          snapshot.forEach((d) => list.push(d.data() as IssuedTicket));
+          if (!snapshot.metadata.fromCache) {
+            this.lastServerSyncAt = Date.now();
+          }
+          this.applyServerIssuedTickets(list);
+        },
+        (err) => logFirestoreError(err, 'list', 'issuedTickets')
+      )
+    );
+
+    // Gate Check-In Logs listener (Admin-only)
+    this.adminUnsubscribers.push(
+      onSnapshot(
+        collection(db, 'checkInLogs'),
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (snapshot.metadata.fromCache && snapshot.empty) return;
+          const list: CheckInLog[] = [];
+          snapshot.forEach((d) => list.push(d.data() as CheckInLog));
+          this.applyServerLogs(list);
+        },
+        (err) => logFirestoreError(err, 'list', 'checkInLogs')
+      )
+    );
   }
 
   private sortBookingsNewestFirst(list: Booking[]): Booking[] {
@@ -159,21 +241,20 @@ class StorageService {
     });
   }
 
-  private applyServerTicketTypes(rawList: TicketType[], isCleared: boolean) {
+  private applyServerTicketTypes(rawList: TicketType[]) {
     if (rawList.length > 0) {
       this.ticketTypesCache = rawList;
-      this.reconcileTicketTypesWithActualData(true);
+      if (this.getCurrentUser().role !== 'customer' && this.hasFirestoreBookingsSync) {
+        this.reconcileTicketTypesWithActualData(true);
+      } else {
+        safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, rawList);
+      }
       this.notify();
-    } else if (!isCleared) {
-      INITIAL_TICKET_TYPES.forEach((tt) => {
-        setDoc(doc(db, 'ticketTypes', tt.id), sanitizeForFirestore(tt)).catch((err) =>
-          logFirestoreError(err, 'write', `ticketTypes/${tt.id}`)
-        );
-      });
     }
   }
 
   private applyServerBookings(rawList: Booking[]) {
+    if (this.getCurrentUser().role === 'customer') return;
     this.hasFirestoreBookingsSync = true;
     const sorted = this.sortBookingsNewestFirst(rawList);
     const reconciled = this.reconcileSingleBookingPrices(sorted, true);
@@ -181,44 +262,34 @@ class StorageService {
     if (this.issuedTicketsCache) {
       this.issuedTicketsCache = this.sortIssuedTicketsNewestFirst(this.issuedTicketsCache, reconciled);
     }
-    if (this.getCurrentUser().role !== 'customer') {
-      safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, reconciled);
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.BOOKINGS);
-    }
+    safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, reconciled);
     this.reconcileTicketTypesWithActualData(true);
     this.notify();
   }
 
   private applyServerIssuedTickets(rawList: IssuedTicket[]) {
+    if (this.getCurrentUser().role === 'customer') return;
     const sorted = this.sortIssuedTicketsNewestFirst(rawList);
     this.issuedTicketsCache = sorted;
-    if (this.getCurrentUser().role !== 'customer') {
-      safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, sorted);
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.ISSUED_TICKETS);
-    }
+    safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, sorted);
     this.reconcileTicketTypesWithActualData(true);
     this.notify();
   }
 
   private applyServerLogs(rawList: CheckInLog[]) {
+    if (this.getCurrentUser().role === 'customer') return;
     const sorted = [...rawList].sort(
       (a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime()
     );
     const sliced = sorted.slice(0, 150);
     this.logsCache = sliced;
-    if (this.getCurrentUser().role !== 'customer') {
-      safeSetLocalStorage(STORAGE_KEYS.LOGS, sliced);
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.LOGS);
-    }
+    safeSetLocalStorage(STORAGE_KEYS.LOGS, sliced);
     this.notify();
   }
 
   /**
    * Forces an immediate read from Firestore Server (bypasses local cache)
-   * so admin dashboards instantly catch new registrants after tab wake-up or network reconnect.
+   * Only fetches PII collections when signed in as verified Firebase Admin.
    */
   public async syncFromServer(force = false): Promise<boolean> {
     if (typeof window === 'undefined') return false;
@@ -230,34 +301,40 @@ class StorageService {
       return this.activeServerSync;
     }
 
-    const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
+    const isAdminSession =
+      this.getCurrentUser().role !== 'customer' &&
+      (await this.verifyFirebaseAdminUser(auth.currentUser));
 
     this.activeServerSync = (async () => {
       try {
-        const [ttSnap, bkgSnap, tktSnap, logSnap] = await Promise.all([
-          getDocsFromServer(collection(db, 'ticketTypes')),
-          getDocsFromServer(collection(db, 'bookings')),
-          getDocsFromServer(collection(db, 'issuedTickets')),
-          getDocsFromServer(collection(db, 'checkInLogs')),
-        ]);
-
+        const ttSnap = await getDocsFromServer(collection(db, 'ticketTypes'));
         const ttList: TicketType[] = [];
         ttSnap.forEach((d) => ttList.push(d.data() as TicketType));
 
-        const bkgList: Booking[] = [];
-        bkgSnap.forEach((d) => bkgList.push(d.data() as Booking));
+        if (isAdminSession) {
+          const [bkgSnap, tktSnap, logSnap] = await Promise.all([
+            getDocsFromServer(collection(db, 'bookings')),
+            getDocsFromServer(collection(db, 'issuedTickets')),
+            getDocsFromServer(collection(db, 'checkInLogs')),
+          ]);
 
-        const tktList: IssuedTicket[] = [];
-        tktSnap.forEach((d) => tktList.push(d.data() as IssuedTicket));
+          const bkgList: Booking[] = [];
+          bkgSnap.forEach((d) => bkgList.push(d.data() as Booking));
 
-        const logList: CheckInLog[] = [];
-        logSnap.forEach((d) => logList.push(d.data() as CheckInLog));
+          const tktList: IssuedTicket[] = [];
+          tktSnap.forEach((d) => tktList.push(d.data() as IssuedTicket));
+
+          const logList: CheckInLog[] = [];
+          logSnap.forEach((d) => logList.push(d.data() as CheckInLog));
+
+          this.lastServerSyncAt = Date.now();
+          this.applyServerBookings(bkgList);
+          this.applyServerIssuedTickets(tktList);
+          this.applyServerLogs(logList);
+        }
 
         this.lastServerSyncAt = Date.now();
-        this.applyServerBookings(bkgList);
-        this.applyServerIssuedTickets(tktList);
-        this.applyServerTicketTypes(ttList, isCleared);
-        this.applyServerLogs(logList);
+        this.applyServerTicketTypes(ttList);
         return true;
       } catch (err) {
         logFirestoreError(err, 'list', 'syncFromServer');
@@ -275,9 +352,7 @@ class StorageService {
     this.isFirestoreSynced = true;
 
     try {
-      const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
-
-      // 1. Listen to Ticket Types and live quotas
+      // 1. Public Catalog Ticket Types listener (zero PII)
       onSnapshot(
         collection(db, 'ticketTypes'),
         { includeMetadataChanges: true },
@@ -288,57 +363,12 @@ class StorageService {
           if (!snapshot.metadata.fromCache) {
             this.lastServerSyncAt = Date.now();
           }
-          this.applyServerTicketTypes(list, isCleared);
+          this.applyServerTicketTypes(list);
         },
         (err) => logFirestoreError(err, 'list', 'ticketTypes')
       );
 
-      // 2. Listen to Bookings (real-time reflection from all smartphones -> single Admin Dashboard)
-      onSnapshot(
-        collection(db, 'bookings'),
-        { includeMetadataChanges: true },
-        (snapshot) => {
-          if (snapshot.metadata.fromCache && !this.hasFirestoreBookingsSync && snapshot.empty) return;
-          const list: Booking[] = [];
-          snapshot.forEach((d) => list.push(d.data() as Booking));
-          if (!snapshot.metadata.fromCache) {
-            this.lastServerSyncAt = Date.now();
-          }
-          this.applyServerBookings(list);
-        },
-        (err) => logFirestoreError(err, 'list', 'bookings')
-      );
-
-      // 3. Listen to Issued Tickets (real-time attendee biodata & QR status across all devices)
-      onSnapshot(
-        collection(db, 'issuedTickets'),
-        { includeMetadataChanges: true },
-        (snapshot) => {
-          if (snapshot.metadata.fromCache && snapshot.empty) return;
-          const list: IssuedTicket[] = [];
-          snapshot.forEach((d) => list.push(d.data() as IssuedTicket));
-          if (!snapshot.metadata.fromCache) {
-            this.lastServerSyncAt = Date.now();
-          }
-          this.applyServerIssuedTickets(list);
-        },
-        (err) => logFirestoreError(err, 'list', 'issuedTickets')
-      );
-
-      // 4. Listen to Gate Check-In Logs
-      onSnapshot(
-        collection(db, 'checkInLogs'),
-        { includeMetadataChanges: true },
-        (snapshot) => {
-          if (snapshot.metadata.fromCache && snapshot.empty) return;
-          const list: CheckInLog[] = [];
-          snapshot.forEach((d) => list.push(d.data() as CheckInLog));
-          this.applyServerLogs(list);
-        },
-        (err) => logFirestoreError(err, 'list', 'checkInLogs')
-      );
-
-      // 5. Listen to Global Admin Session Epoch (forces immediate logout on other devices when revoked)
+      // 2. Listen to Global Admin Session Epoch (zero PII)
       onSnapshot(
         doc(db, 'events', 'evt_alas_cerita_2026'),
         (snapshot) => {
@@ -356,7 +386,25 @@ class StorageService {
         (err) => logFirestoreError(err, 'get', 'events/evt_alas_cerita_2026')
       );
 
-      // 6. Auto-sync immediately when admin switches back to tab, gains window focus, or reconnects online
+      // 3. Firebase Auth State Observer: ONLY attach PII listeners for verified Google Admin
+      onAuthStateChanged(auth, async (fbUser) => {
+        const isAdminAuth = await this.verifyFirebaseAdminUser(fbUser);
+        const hasLocalAdminRole = this.getCurrentUser().role !== 'customer';
+
+        if (isAdminAuth && hasLocalAdminRole) {
+          this.attachAdminListeners();
+          void this.syncFromServer(true);
+        } else {
+          this.detachAdminListeners();
+          if (hasLocalAdminRole) {
+            // Firebase Auth session missing or invalid -> immediately revoke admin UI access
+            this.clearAdminSessionStorage(false);
+            this.notify();
+          }
+        }
+      });
+
+      // 4. Auto-sync immediately when admin switches back to tab, gains window focus, or reconnects online
       const handleWakeSync = () => {
         if (this.getCurrentUser().role !== 'customer') {
           void this.syncFromServer(false);
@@ -380,19 +428,12 @@ class StorageService {
 
   private initializeDefaults() {
     if (typeof window === 'undefined') return;
-    const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
 
     if (!localStorage.getItem(STORAGE_KEYS.EVENTS)) {
       safeSetLocalStorage(STORAGE_KEYS.EVENTS, INITIAL_EVENTS);
     }
     if (!localStorage.getItem(STORAGE_KEYS.TICKET_TYPES)) {
       safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, INITIAL_TICKET_TYPES);
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.BOOKINGS)) {
-      safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, isCleared ? [] : INITIAL_BOOKINGS);
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.ISSUED_TICKETS)) {
-      safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, isCleared ? [] : INITIAL_ISSUED_TICKETS);
     }
     if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
       safeSetLocalStorage(STORAGE_KEYS.USERS, INITIAL_USERS);
@@ -417,7 +458,7 @@ class StorageService {
     this.listeners.forEach((l) => l());
   }
 
-  private clearAdminSessionStorage() {
+  private clearAdminSessionStorage(alsoSignOutFirebase = true) {
     if (typeof window === 'undefined') return;
     sessionStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION_USER);
     sessionStorage.removeItem(STORAGE_KEYS.ADMIN_SESSION_EPOCH);
@@ -426,6 +467,14 @@ class StorageService {
     localStorage.removeItem(STORAGE_KEYS.BOOKINGS);
     localStorage.removeItem(STORAGE_KEYS.ISSUED_TICKETS);
     localStorage.removeItem(STORAGE_KEYS.LOGS);
+    this.bookingsCache = null;
+    this.issuedTicketsCache = null;
+    this.logsCache = null;
+    this.hasFirestoreBookingsSync = false;
+    this.detachAdminListeners();
+    if (alsoSignOutFirebase && auth.currentUser) {
+      void signOut(auth).catch(() => {});
+    }
   }
 
   private assertAuthorizedRole(allowedRoles: UserRole[]): User | null {
@@ -585,7 +634,8 @@ class StorageService {
           { merge: true }
         ).catch((err) => logFirestoreError(err, 'write', 'events/evt_alas_cerita_2026'));
 
-        // Immediately sync freshest server records upon Admin login
+        // Attach admin Firestore listeners & immediately sync freshest server records
+        this.attachAdminListeners();
         void this.syncFromServer(true);
       }
     }
@@ -699,11 +749,42 @@ class StorageService {
     revenue: number;
     activePrice: number;
   } {
-    const bookings = bookingsInput ?? this.getBookings();
-    const issuedTickets = issuedTicketsInput ?? this.getIssuedTickets();
     const capacityPerPackage = this.getTierPackageCapacity(tier);
     const tierNameLower = (tier.name || '').toLowerCase();
     const isSingle = this.isSingleTier(tier);
+
+    // Public visitor isolation: derive availability & active Single tier price from public /ticketTypes only (zero PII access)
+    if (!this.hasFirestoreBookingsSync && this.getCurrentUser().role === 'customer') {
+      const heldPackages = Math.max(0, tier.heldQuota || 0);
+      const remainingPackages = Math.max(0, tier.availableQuota ?? tier.quota);
+      const soldPackages = Math.max(0, tier.quota - remainingPackages - heldPackages);
+      const totalUsedPackages = soldPackages + heldPackages;
+      const percentSold = tier.quota > 0 ? Math.min(100, Math.round((totalUsedPackages / tier.quota) * 100)) : 0;
+      const activePrice = isSingle
+        ? totalUsedPackages < SINGLE_PROMO_LIMIT
+          ? SINGLE_PROMO_PRICE
+          : SINGLE_REGULAR_PRICE
+        : tier.price;
+
+      return {
+        capacityPerPackage,
+        soldPackages,
+        heldPackages,
+        totalUsedPackages,
+        remainingPackages,
+        percentSold,
+        attendeeCount: totalUsedPackages * capacityPerPackage,
+        checkedInCount: 0,
+        verifiedBookingsCount: soldPackages,
+        awaitingVerificationCount: 0,
+        pendingBookingsCount: 0,
+        revenue: 0,
+        activePrice,
+      };
+    }
+
+    const bookings = bookingsInput ?? this.getBookings();
+    const issuedTickets = issuedTicketsInput ?? this.getIssuedTickets();
     const nowMs = Date.now();
 
     const bookingTicketMap = new Map<string, IssuedTicket[]>();
@@ -830,6 +911,7 @@ class StorageService {
   }
 
   private reconcileTicketTypesWithActualData(syncFirestore = false) {
+    if (this.getCurrentUser().role === 'customer' || !this.hasFirestoreBookingsSync) return;
     const rawTiers = this.getRawTicketTypes();
     if (rawTiers.length === 0) return;
 
@@ -1016,21 +1098,16 @@ class StorageService {
     );
   }
 
-  // --- Device-Local Purchase History (Strictly scoped to THIS smartphone/browser) ---
-  private recordDevicePurchase(booking: Booking, tickets: IssuedTicket[]) {
+  // --- Device-Local Purchase History (Strictly scoped to THIS smartphone/browser, minimal receipt data only) ---
+  private recordDevicePurchase(booking: Booking, _tickets: IssuedTicket[]) {
     if (typeof window === 'undefined') return;
     try {
       const rawBookings = localStorage.getItem(STORAGE_KEYS.MY_LOCAL_BOOKINGS);
       const localBookings: Booking[] = rawBookings ? JSON.parse(rawBookings) : [];
       const filteredBookings = localBookings.filter((b) => b.id !== booking.id);
-      filteredBookings.unshift(booking);
+      const { paymentProofUrl: _omitProof, ...minimalReceipt } = booking;
+      filteredBookings.unshift(minimalReceipt as Booking);
       safeSetLocalStorage(STORAGE_KEYS.MY_LOCAL_BOOKINGS, filteredBookings);
-
-      const rawTickets = localStorage.getItem(STORAGE_KEYS.MY_LOCAL_TICKETS);
-      const localTickets: IssuedTicket[] = rawTickets ? JSON.parse(rawTickets) : [];
-      const newIds = new Set(tickets.map((t) => t.id));
-      const filteredTickets = localTickets.filter((t) => !newIds.has(t.id));
-      safeSetLocalStorage(STORAGE_KEYS.MY_LOCAL_TICKETS, [...tickets, ...filteredTickets]);
     } catch {
       // ignore local storage restriction
     }
@@ -1043,19 +1120,16 @@ class StorageService {
       const localBookings: Booking[] = rawBookings ? JSON.parse(rawBookings) : [];
       if (localBookings.length === 0) return [];
 
-      const rawTickets = localStorage.getItem(STORAGE_KEYS.MY_LOCAL_TICKETS);
-      const localTickets: IssuedTicket[] = rawTickets ? JSON.parse(rawTickets) : [];
-
-      const liveBookings = this.getBookings();
-      const liveTickets = this.getIssuedTickets();
+      const isAdminSession = this.getCurrentUser().role !== 'customer';
+      const liveBookings = isAdminSession ? this.getBookings() : [];
+      const liveTickets = isAdminSession ? this.getIssuedTickets() : [];
       const liveBookingsMap = new Map(liveBookings.map((b) => [b.id, b]));
 
       const results: Array<{ booking: Booking; tickets: IssuedTicket[] }> = [];
 
       for (const localBkg of localBookings) {
         const liveBkg = liveBookingsMap.get(localBkg.id);
-        // If cloud snapshot is synced and admin deleted this booking, omit it from device history
-        if (this.hasFirestoreBookingsSync && !liveBkg) {
+        if (isAdminSession && this.hasFirestoreBookingsSync && !liveBkg) {
           continue;
         }
 
@@ -1063,15 +1137,14 @@ class StorageService {
           ? {
               ...localBkg,
               ...liveBkg,
-              paymentProofUrl: liveBkg.paymentProofUrl || localBkg.paymentProofUrl,
             }
           : localBkg;
 
-        const matchingLiveTickets = liveTickets.filter((t) => t.bookingId === localBkg.id);
-        const matchingLocalTickets = localTickets.filter((t) => t.bookingId === localBkg.id);
-        const tickets = matchingLiveTickets.length > 0 ? matchingLiveTickets : matchingLocalTickets;
+        const matchingLiveTickets = isAdminSession
+          ? liveTickets.filter((t) => t.bookingId === localBkg.id)
+          : [];
 
-        results.push({ booking: mergedBooking, tickets });
+        results.push({ booking: mergedBooking, tickets: matchingLiveTickets });
       }
 
       results.sort(
@@ -1083,11 +1156,49 @@ class StorageService {
     }
   }
 
+  public async refreshMyDevicePurchasesFromServer(): Promise<void> {
+    if (typeof window === 'undefined') return;
+    try {
+      const rawBookings = localStorage.getItem(STORAGE_KEYS.MY_LOCAL_BOOKINGS);
+      const localBookings: Booking[] = rawBookings ? JSON.parse(rawBookings) : [];
+      if (localBookings.length === 0) return;
+
+      let changed = false;
+      const updated = await Promise.all(
+        localBookings.map(async (b, idx) => {
+          if (idx >= 20 || b.verificationStatus === 'verified') return b;
+          try {
+            const snap = await getDocFromServer(doc(db, 'bookingStatuses', b.id));
+            if (snap.exists()) {
+              const status = (snap.data() as { verificationStatus?: Booking['verificationStatus'] }).verificationStatus;
+              if (status && status !== b.verificationStatus) {
+                changed = true;
+                return { ...b, verificationStatus: status };
+              }
+            }
+          } catch {
+            // Keep existing local status if network unavailable or doc absent
+          }
+          return b;
+        })
+      );
+
+      if (changed) {
+        safeSetLocalStorage(STORAGE_KEYS.MY_LOCAL_BOOKINGS, updated);
+        this.notify();
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
+
   // --- Bookings & Concurrency Quota Hold (FR-BKG-02) ---
   public getBookings(): Booking[] {
+    if (this.getCurrentUser().role === 'customer') {
+      return this.bookingsCache || [];
+    }
     try {
       if (this.bookingsCache) return this.bookingsCache;
-      const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
       const data = localStorage.getItem(STORAGE_KEYS.BOOKINGS);
       if (data !== null) {
         const parsed: Booking[] = JSON.parse(data);
@@ -1095,7 +1206,7 @@ class StorageService {
         this.bookingsCache = reconciled;
         return reconciled;
       }
-      return isCleared ? [] : INITIAL_BOOKINGS;
+      return [];
     } catch {
       return [];
     }
@@ -1132,6 +1243,7 @@ class StorageService {
     try {
       await Promise.all([
         deleteDoc(doc(db, 'bookings', bookingId)),
+        deleteDoc(doc(db, 'bookingStatuses', bookingId)).catch(() => {}),
         ...ticketsToDelete.map((t) => deleteDoc(doc(db, 'issuedTickets', t.id))),
       ]);
     } catch (err) {
@@ -1175,6 +1287,12 @@ class StorageService {
       };
     }
 
+    // Calculate booking total amount BEFORE deducting temporary hold so Single tier pricing reads exact slot count
+    const computedTotalAmount =
+      params.ticketTypeId === 'tt_alas_single'
+        ? this.calculateSingleTotal(safeQuantity)
+        : targetTT.price * safeQuantity;
+
     // 2. Pessimistic local lock reduction: deduct available quota, add to heldQuota
     targetTT.availableQuota -= safeQuantity;
     targetTT.heldQuota = (targetTT.heldQuota || 0) + safeQuantity;
@@ -1182,16 +1300,10 @@ class StorageService {
     this.ticketTypesCache = ticketTypes;
     safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, ticketTypes);
 
-    // Calculate booking total amount (with Single tiered pricing: #1–13 = Rp 70.000, #14+ = Rp 80.000)
-    const computedTotalAmount =
-      params.ticketTypeId === 'tt_alas_single'
-        ? this.calculateSingleTotal(safeQuantity)
-        : targetTT.price * safeQuantity;
-
-    // 3. Generate booking with collision-proof ID and 30 minute expiration
+    // 3. Generate booking with CSPRNG collision-proof ID and 30 minute expiration
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
-    const invoiceNum = Math.floor(1000 + Math.random() * 9000);
+    const invoiceNum = 1000 + secureRandomInt(9000);
     const invoiceCode = `INV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${invoiceNum}`;
     const bookingId = `bkg_${Date.now()}_${generateUniqueSuffix(5)}`;
 
@@ -1335,34 +1447,41 @@ class StorageService {
     try {
       const firestoreWrites: Promise<unknown>[] = [
         setDoc(doc(db, 'bookings', booking.id), sanitizeForFirestore(booking)),
+        setDoc(doc(db, 'bookingStatuses', booking.id), {
+          id: booking.id,
+          verificationStatus: 'pending_verification',
+        }),
         ...newIssued.map((t) => setDoc(doc(db, 'issuedTickets', t.id), sanitizeForFirestore(t))),
       ];
 
       if (ticketType) {
         const ttRef = doc(db, 'ticketTypes', ticketType.id);
         const isSingleTier = ticketType.id === 'tt_alas_single';
-        const projectedSingleCount =
-          this.getIssuedTickets().filter(
-            (t) => t.ticketTypeId === 'tt_alas_single' || t.packageName?.toLowerCase() === 'single'
-          ).length + (isSingleTier ? newIssued.length : 0);
-        const nextSinglePrice =
-          projectedSingleCount < SINGLE_PROMO_LIMIT ? SINGLE_PROMO_PRICE : SINGLE_REGULAR_PRICE;
 
         firestoreWrites.push(
           runTransaction(db, async (tx) => {
             const snap = await tx.get(ttRef);
             if (!snap.exists()) {
-              tx.set(
-                ttRef,
-                sanitizeForFirestore(
-                  isSingleTier ? { ...ticketType, price: nextSinglePrice } : ticketType
-                )
-              );
+              if (this.getCurrentUser().role !== 'customer') {
+                const usedCount = Math.max(0, ticketType.quota - ticketType.availableQuota);
+                const nextPrice = usedCount < SINGLE_PROMO_LIMIT ? SINGLE_PROMO_PRICE : SINGLE_REGULAR_PRICE;
+                tx.set(
+                  ttRef,
+                  sanitizeForFirestore(
+                    isSingleTier ? { ...ticketType, price: nextPrice } : ticketType
+                  )
+                );
+              }
               return;
             }
             const currentData = snap.data() as TicketType;
-            const updatedAvailable = Math.max(0, (currentData.availableQuota ?? ticketType.quota) - booking.quantity);
+            const totalQuota = currentData.quota ?? ticketType.quota;
+            const currentAvailable = currentData.availableQuota ?? totalQuota;
+            const updatedAvailable = Math.max(0, currentAvailable - booking.quantity);
             if (isSingleTier) {
+              const totalUsedAfterPurchase = Math.max(0, totalQuota - updatedAvailable);
+              const nextSinglePrice =
+                totalUsedAfterPurchase < SINGLE_PROMO_LIMIT ? SINGLE_PROMO_PRICE : SINGLE_REGULAR_PRICE;
               tx.update(ttRef, { availableQuota: updatedAvailable, price: nextSinglePrice });
             } else {
               tx.update(ttRef, { availableQuota: updatedAvailable });
@@ -1381,21 +1500,22 @@ class StorageService {
     }
 
     // Update local state caches & cleanup temp map after confirmed cloud write
-    bookings[bIndex] = booking;
-    this.bookingsCache = bookings;
-
-    const updatedIssued = [...newIssued, ...existingIssued];
-    this.issuedTicketsCache = updatedIssued;
-
     if (this.getCurrentUser().role !== 'customer') {
+      bookings[bIndex] = booking;
+      this.bookingsCache = bookings;
+      const updatedIssued = [...newIssued, ...existingIssued];
+      this.issuedTicketsCache = updatedIssued;
       safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, bookings);
       safeSetLocalStorage(STORAGE_KEYS.ISSUED_TICKETS, updatedIssued);
+    } else {
+      // Clear pending checkout draft from memory on public devices after cloud submission
+      this.bookingsCache = bookings.filter((b) => b.id !== booking.id);
     }
 
     this.ticketTypesCache = ticketTypes;
     safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, ticketTypes);
 
-    // Record this purchase exclusively inside THIS device's local history
+    // Record non-sensitive purchase receipt exclusively inside THIS device's local history
     this.recordDevicePurchase(booking, newIssued);
 
     this.pendingAttendeesMap.delete(booking.id);
@@ -1440,6 +1560,10 @@ class StorageService {
           logFirestoreError(err, 'update', `bookings/${bookingId}`)
         )
       );
+      setDoc(doc(db, 'bookingStatuses', bookingId), {
+        id: bookingId,
+        verificationStatus: 'verified',
+      }).catch((err) => logFirestoreError(err, 'write', `bookingStatuses/${bookingId}`));
     }
 
     const allTickets = [...this.getIssuedTickets()];
@@ -1506,7 +1630,9 @@ class StorageService {
     if (updated) {
       this.bookingsCache = bookings;
       this.ticketTypesCache = ticketTypes;
-      safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, bookings);
+      if (this.getCurrentUser().role !== 'customer') {
+        safeSetLocalStorage(STORAGE_KEYS.BOOKINGS, bookings);
+      }
       safeSetLocalStorage(STORAGE_KEYS.TICKET_TYPES, ticketTypes);
       this.notify();
     }
@@ -1514,13 +1640,15 @@ class StorageService {
 
   // --- Issued Tickets & Gate Validation (FR-CHK-01, FR-CHK-02, FR-CHK-03) ---
   public getIssuedTickets(eventId?: string): IssuedTicket[] {
+    if (this.getCurrentUser().role === 'customer') {
+      return [];
+    }
     try {
       if (this.issuedTicketsCache) {
         return eventId ? this.issuedTicketsCache.filter((t) => t.eventId === eventId) : this.issuedTicketsCache;
       }
-      const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
       const data = localStorage.getItem(STORAGE_KEYS.ISSUED_TICKETS);
-      const all: IssuedTicket[] = data !== null ? JSON.parse(data) : (isCleared ? [] : INITIAL_ISSUED_TICKETS);
+      const all: IssuedTicket[] = data !== null ? JSON.parse(data) : [];
       this.issuedTicketsCache = all;
       return eventId ? all.filter((t) => t.eventId === eventId) : all;
     } catch {
@@ -1899,16 +2027,18 @@ class StorageService {
 
   // --- Audit Logs (NFR-AUD-01) ---
   public getLogs(): CheckInLog[] {
+    if (this.getCurrentUser().role === 'customer') {
+      return [];
+    }
     try {
       if (this.logsCache) return this.logsCache;
-      const isCleared = localStorage.getItem(STORAGE_KEYS.SIMULATION_CLEARED) === 'true';
       const data = localStorage.getItem(STORAGE_KEYS.LOGS);
       if (data !== null) {
         const parsed = JSON.parse(data);
         this.logsCache = parsed;
         return parsed;
       }
-      return isCleared ? [] : INITIAL_LOGS;
+      return [];
     } catch {
       return [];
     }
@@ -1926,12 +2056,12 @@ class StorageService {
     this.logsCache = sliced;
     if (this.getCurrentUser().role !== 'customer') {
       safeSetLocalStorage(STORAGE_KEYS.LOGS, sliced);
+      if (auth.currentUser) {
+        setDoc(doc(db, 'checkInLogs', newLog.id), sanitizeForFirestore(newLog)).catch((err) =>
+          logFirestoreError(err, 'write', `checkInLogs/${newLog.id}`)
+        );
+      }
     }
-
-    // Sync log to Firestore
-    setDoc(doc(db, 'checkInLogs', newLog.id), sanitizeForFirestore(newLog)).catch((err) =>
-      logFirestoreError(err, 'write', `checkInLogs/${newLog.id}`)
-    );
 
     this.notify();
   }

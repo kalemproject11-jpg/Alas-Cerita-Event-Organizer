@@ -16,6 +16,17 @@ service cloud.firestore {
       return resource.data;
     }
 
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'kalemproject11@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.token.email))
+      );
+    }
+
     function isValidId(id) {
       return id is string && id.size() >= 3 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
@@ -54,6 +65,8 @@ service cloud.firestore {
         data.customerPhone is string && data.customerPhone.size() >= 6 && data.customerPhone.size() <= 30 &&
         data.invoiceCode is string && data.invoiceCode.size() >= 6 && data.invoiceCode.size() <= 40 &&
         data.invoiceCode.matches('^INV-[0-9A-Za-z_\\-]+$') &&
+        data.createdAt is string && data.createdAt.size() <= 64 &&
+        data.expiresAt is string && data.expiresAt.size() <= 64 &&
         data.paymentStatus == 'paid' &&
         data.verificationStatus == 'pending_verification' &&
         data.quantity is int && data.quantity >= 1 && data.quantity <= 20 &&
@@ -65,7 +78,17 @@ service cloud.firestore {
         ) &&
         (!('paymentProofUrl' in data) || isValidProofUrl(data.paymentProofUrl)) &&
         (!('senderName' in data) || (data.senderName is string && data.senderName.size() <= 120)) &&
-        (!('paymentMethod' in data) || (data.paymentMethod is string && data.paymentMethod.size() <= 30));
+        (!('paymentMethod' in data) || (data.paymentMethod is string && data.paymentMethod.size() <= 30)) &&
+        (!('proofUploadedAt' in data) || (data.proofUploadedAt is string && data.proofUploadedAt.size() <= 64)) &&
+        (!('paidAt' in data) || (data.paidAt is string && data.paidAt.size() <= 64));
+    }
+
+    function isValidBookingStatusCreate(data, bookingId) {
+      return isValidId(bookingId) &&
+        data.keys().hasAll(['id', 'verificationStatus']) &&
+        data.keys().hasOnly(['id', 'verificationStatus']) &&
+        data.id == bookingId &&
+        data.verificationStatus == 'pending_verification';
     }
 
     function isValidIssuedTicketCreate(data, ticketId) {
@@ -91,6 +114,9 @@ service cloud.firestore {
         data.attendeeEmail is string && data.attendeeEmail.size() >= 3 && data.attendeeEmail.size() <= 150 &&
         data.attendeePhone is string && data.attendeePhone.size() >= 6 && data.attendeePhone.size() <= 30 &&
         (!('attendeeOrigin' in data) || (data.attendeeOrigin is string && data.attendeeOrigin.size() <= 150)) &&
+        (!('packageName' in data) || (data.packageName is string && data.packageName.size() <= 60)) &&
+        (!('packageGroupName' in data) || (data.packageGroupName is string && data.packageGroupName.size() <= 120)) &&
+        (!('seat_or_gate' in data) || (data.seat_or_gate is string && data.seat_or_gate.size() <= 150)) &&
         data.ticketNumber is string && data.ticketNumber.matches('^TCK-[2-9A-HJ-NP-Z]{4,8}$') &&
         data.qrToken is string && data.qrToken.size() >= 16 && data.qrToken.size() <= 64 &&
         data.status == 'valid' &&
@@ -102,6 +128,9 @@ service cloud.firestore {
         data.keys().hasAll(['id', 'staffId', 'staffName', 'method', 'result', 'message', 'deviceInfo', 'scannedAt', 'gateName']) &&
         data.keys().hasOnly(['id', 'issuedTicketId', 'ticketNumber', 'attendeeName', 'staffId', 'staffName', 'method', 'result', 'message', 'deviceInfo', 'scannedAt', 'gateName']) &&
         data.id == logId &&
+        (!('issuedTicketId' in data) || isValidId(data.issuedTicketId)) &&
+        (!('ticketNumber' in data) || (data.ticketNumber is string && data.ticketNumber.size() <= 32)) &&
+        (!('attendeeName' in data) || (data.attendeeName is string && data.attendeeName.size() <= 120)) &&
         data.staffId is string && data.staffId.size() <= 64 &&
         data.staffName is string && data.staffName.size() <= 120 &&
         data.method in ['qr_scanner', 'manual_supervisor'] &&
@@ -112,40 +141,69 @@ service cloud.firestore {
         data.gateName is string && data.gateName.size() <= 120;
     }
 
-    // Events: Read-only catalog, only adminSessionEpoch can advance monotonically
+    // Authorized Admin Allowlist (managed via Firebase Console / Root Admin only)
+    match /admins/{adminEmail} {
+      allow get: if isSignedIn() && request.auth.token.email == adminEmail;
+      allow list, create, update, delete: if false;
+    }
+
+    // Events: Public catalog read, only authenticated Admin can advance adminSessionEpoch
     match /events/{eventId} {
       allow read: if true;
       allow create, delete: if false;
-      allow update: if eventId == 'evt_alas_cerita_2026' &&
+      allow update: if isValidId(eventId) &&
+        isAdmin() &&
+        eventId == 'evt_alas_cerita_2026' &&
         incoming().diff(existing()).affectedKeys().hasOnly(['adminSessionEpoch']) &&
         incoming().adminSessionEpoch is number &&
         incoming().adminSessionEpoch > 0 &&
         (!('adminSessionEpoch' in existing()) || incoming().adminSessionEpoch >= existing().adminSessionEpoch);
     }
 
-    // Ticket Types: Public read, strictly bounded quota/price sync updates, no delete
+    // Ticket Types: Public read, Admin manages quotas/tiers, public checkout can ONLY decrement availableQuota cleanly
     match /ticketTypes/{ticketTypeId} {
       allow read: if true;
       allow delete: if false;
-      allow create: if isValidTierId(ticketTypeId) &&
+      allow create: if isValidId(ticketTypeId) &&
+        isAdmin() &&
+        isValidTierId(ticketTypeId) &&
         incoming().id == ticketTypeId &&
         incoming().eventId == 'evt_alas_cerita_2026' &&
         incoming().quota is int && incoming().quota > 0 && incoming().quota <= 500 &&
         incoming().availableQuota is int && incoming().availableQuota >= 0 && incoming().availableQuota <= incoming().quota &&
         incoming().price in [70000, 80000, 155000, 225000];
-      allow update: if isValidTierId(ticketTypeId) &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['availableQuota', 'heldQuota', 'price', 'description']) &&
-        incoming().availableQuota is int && incoming().availableQuota >= 0 && incoming().availableQuota <= existing().quota &&
-        (!('heldQuota' in incoming()) || (incoming().heldQuota is int && incoming().heldQuota >= 0 && incoming().heldQuota <= existing().quota)) &&
-        incoming().price in [70000, 80000, 155000, 225000] &&
-        (!('description' in incoming()) || (incoming().description is string && incoming().description.size() <= 300));
+      allow update: if isValidId(ticketTypeId) &&
+        isValidTierId(ticketTypeId) &&
+        (
+          (
+            isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['availableQuota', 'heldQuota', 'price', 'description']) &&
+            incoming().availableQuota is int && incoming().availableQuota >= 0 && incoming().availableQuota <= existing().quota &&
+            (!('heldQuota' in incoming()) || (incoming().heldQuota is int && incoming().heldQuota >= 0 && incoming().heldQuota <= existing().quota)) &&
+            incoming().price in [70000, 80000, 155000, 225000] &&
+            (!('description' in incoming()) || (incoming().description is string && incoming().description.size() <= 300))
+          ) ||
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['availableQuota', 'price']) &&
+            incoming().availableQuota is int &&
+            incoming().availableQuota >= 0 &&
+            incoming().availableQuota < existing().availableQuota &&
+            incoming().availableQuota >= existing().availableQuota - 20 &&
+            (
+              (ticketTypeId == 'tt_alas_single' && incoming().price in [70000, 80000]) ||
+              (ticketTypeId != 'tt_alas_single' && incoming().price == existing().price)
+            )
+          )
+        );
     }
 
-    // Bookings: Validated creation (pending verification + server-checked prices), immutable core fields on update
+    // Bookings: Strict zero-PII isolation! Only authenticated Admin can read, list, verify, or delete bookings.
     match /bookings/{bookingId} {
-      allow read: if true;
+      allow list: if isAdmin();
+      allow get: if isValidId(bookingId) && isAdmin();
       allow create: if isValidBookingCreate(incoming(), bookingId);
       allow update: if isValidId(bookingId) &&
+        isAdmin() &&
         incoming().id == existing().id &&
         incoming().invoiceCode == existing().invoiceCode &&
         incoming().createdAt == existing().createdAt &&
@@ -167,14 +225,38 @@ service cloud.firestore {
             incoming().totalAmount <= 225000 * existing().get('quantity', 1)
           )
         );
-      allow delete: if isValidId(bookingId);
+      allow delete: if isValidId(bookingId) && isAdmin();
     }
 
-    // Issued Tickets: Validated creation, terminal check-in state locking (anti-double-scan reset guard)
+    // Split non-PII status collection for buyer's device-local Riwayat Pembelian lookup (zero PII stored)
+    match /bookingStatuses/{bookingId} {
+      allow get: if isValidId(bookingId);
+      allow list: if false;
+      allow create: if isValidBookingStatusCreate(incoming(), bookingId) ||
+        (
+          isAdmin() &&
+          isValidId(bookingId) &&
+          incoming().keys().hasAll(['id', 'verificationStatus']) &&
+          incoming().keys().hasOnly(['id', 'verificationStatus']) &&
+          incoming().id == bookingId &&
+          incoming().verificationStatus in ['pending_verification', 'verified', 'rejected']
+        );
+      allow update: if isValidId(bookingId) &&
+        isAdmin() &&
+        incoming().keys().hasAll(['id', 'verificationStatus']) &&
+        incoming().keys().hasOnly(['id', 'verificationStatus']) &&
+        incoming().id == existing().id &&
+        incoming().verificationStatus in ['pending_verification', 'verified', 'rejected'];
+      allow delete: if isValidId(bookingId) && isAdmin();
+    }
+
+    // Issued Tickets: Strict zero-PII & QR token protection! Only authenticated Admin can read, list, scan, verify, or delete.
     match /issuedTickets/{ticketId} {
-      allow read: if true;
+      allow list: if isAdmin();
+      allow get: if isValidId(ticketId) && isAdmin();
       allow create: if isValidIssuedTicketCreate(incoming(), ticketId);
       allow update: if isValidId(ticketId) &&
+        isAdmin() &&
         incoming().id == existing().id &&
         incoming().bookingId == existing().bookingId &&
         incoming().ticketNumber == existing().ticketNumber &&
@@ -197,13 +279,14 @@ service cloud.firestore {
             (!('notes' in incoming()) || (incoming().notes is string && incoming().notes.size() <= 300))
           )
         );
-      allow delete: if isValidId(ticketId);
+      allow delete: if isValidId(ticketId) && isAdmin();
     }
 
-    // Check-in & Security Audit Logs: Strictly append-only & immutable
+    // Check-in & Security Audit Logs: Strictly Admin-only & immutable append-only
     match /checkInLogs/{logId} {
-      allow read: if true;
-      allow create: if isValidCheckInLog(incoming(), logId);
+      allow list: if isAdmin();
+      allow get: if isValidId(logId) && isAdmin();
+      allow create: if isValidId(logId) && isAdmin() && isValidCheckInLog(incoming(), logId);
       allow update, delete: if false;
     }
   }
