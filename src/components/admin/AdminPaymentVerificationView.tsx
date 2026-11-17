@@ -29,8 +29,10 @@ import {
   ShieldCheck,
   Share2,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  FileSpreadsheet
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface AdminPaymentVerificationViewProps {
   bookings: Booking[];
@@ -133,6 +135,76 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
     for (const ticket of bookingTickets) {
       await handleDownloadTicket(ticket);
     }
+  };
+
+  const handleExportParticipantsExcel = () => {
+    if (filteredAttendees.length === 0) return;
+
+    const rows = filteredAttendees.map((t, idx) => {
+      const relatedBooking = bookings.find((b) => b.id === t.bookingId);
+      const isCheckedIn = t.status === 'checked-in';
+      const isVerified =
+        t.verificationStatus === 'verified' || relatedBooking?.verificationStatus === 'verified';
+
+      const statusText = isCheckedIn
+        ? 'SUDAH MASUK GATE'
+        : isVerified
+        ? 'TERVERIFIKASI'
+        : 'MENUNGGU VERIFIKASI';
+
+      const packageText = t.packageName
+        ? `Paket ${t.packageName} (${t.packageMemberIndex || 1}/${t.packageTotalMembers || 1})`
+        : t.ticketTypeName || '-';
+
+      const registeredDate = relatedBooking?.createdAt
+        ? new Date(relatedBooking.createdAt).toLocaleString('id-ID', {
+            dateStyle: 'short',
+            timeStyle: 'short',
+          }) + ' WIB'
+        : '-';
+
+      return {
+        No: idx + 1,
+        'ID Tiket': t.ticketNumber || '-',
+        'Nama Lengkap Peserta': t.attendeeName || '-',
+        'Asal / Lembaga': t.attendeeOrigin || t.attendeeNik || '-',
+        'No. HP / WhatsApp': t.attendeePhone || '-',
+        Email: t.attendeeEmail || '-',
+        'Paket / Bundle': packageText,
+        Pemesan: relatedBooking?.customerName || t.attendeeName || '-',
+        'Kode Invoice': relatedBooking?.invoiceCode || '-',
+        'Metode Pembayaran': relatedBooking?.paymentMethod
+          ? relatedBooking.paymentMethod.toUpperCase()
+          : '-',
+        'Status Verifikasi': statusText,
+        'Tanggal Daftar': registeredDate,
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = [
+      { wch: 5 },  // No
+      { wch: 12 }, // ID Tiket
+      { wch: 28 }, // Nama Lengkap Peserta
+      { wch: 24 }, // Asal / Lembaga
+      { wch: 18 }, // No. HP / WhatsApp
+      { wch: 28 }, // Email
+      { wch: 22 }, // Paket / Bundle
+      { wch: 24 }, // Pemesan
+      { wch: 22 }, // Kode Invoice
+      { wch: 16 }, // Metode Pembayaran
+      { wch: 22 }, // Status Verifikasi
+      { wch: 20 }, // Tanggal Daftar
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Biodata Peserta');
+
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `Biodata_Peserta_Alas_Cerita_${dateStamp}.xlsx`);
+
+    setFeedbackMessage(`Berhasil mengunduh file Excel biodata ${filteredAttendees.length} peserta.`);
+    setTimeout(() => setFeedbackMessage(null), 4000);
   };
 
   const executeDeleteBooking = async () => {
@@ -547,13 +619,26 @@ export const AdminPaymentVerificationView: React.FC<AdminPaymentVerificationView
       {/* TAB 2: DAFTAR SELURUH BIODATA PESERTA LENGKAP */}
       {viewMode === 'attendees' && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-pink-200/80">
-            <span>
-              Menampilkan <strong className="text-white tabular-nums">{filteredAttendees.length}</strong> dari <strong className="text-white tabular-nums">{issuedTickets.length}</strong> peserta terdaftar.
-            </span>
-            <span className="font-mono text-pink-300/70 text-[11px]">
-              Setiap peserta memiliki E-Ticket mandiri yang dapat diunduh untuk dikirim via WhatsApp / Email.
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-pink-200/80">
+            <div className="space-y-0.5">
+              <span className="block">
+                Menampilkan <strong className="text-white tabular-nums">{filteredAttendees.length}</strong> dari <strong className="text-white tabular-nums">{issuedTickets.length}</strong> peserta terdaftar.
+              </span>
+              <span className="font-mono text-pink-300/70 text-[11px] block">
+                Setiap peserta memiliki E-Ticket mandiri yang dapat diunduh untuk dikirim via WhatsApp / Email.
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleExportParticipantsExcel}
+              disabled={filteredAttendees.length === 0}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-600/25 inline-flex items-center justify-center gap-2 cursor-pointer shrink-0 whitespace-nowrap min-h-[40px]"
+              title="Unduh tabel biodata peserta sebagai file Microsoft Excel (.xlsx)"
+            >
+              <FileSpreadsheet className="w-4 h-4 shrink-0" />
+              <span>Download Excel (.xlsx)</span>
+            </button>
           </div>
 
           {/* Mobile Card View (< md) */}
